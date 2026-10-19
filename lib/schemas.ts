@@ -55,13 +55,13 @@ export type NormalizedQuestion = Omit<ParsedQuestion, "question_type"> & { quest
 const platform = z.enum(["ms_teams", "google_classroom", "manual"]);
 
 export const ParseAssignmentRequest = z.object({
-  text: z.string().trim().min(5, "Paste some text first.").max(100_000, "Text is too long (100k chars max)."),
+  text: z.string().trim().max(100_000, "Text is too long (100k chars max).").default(""),
   source_platform: platform.default("manual"),
   default_course_code: z.string().trim().max(10).nullish(),
 });
 
 export const ParseQuizRequest = z.object({
-  text: z.string().trim().min(10, "Paste some quiz text first.").max(100_000, "Text is too long (100k chars max)."),
+  text: z.string().trim().max(100_000, "Text is too long (100k chars max).").default(""),
   course_code: z.string().trim().min(5).max(10),
 });
 
@@ -166,3 +166,74 @@ export const WebhookPayload = z.union([
   z.object({ assignments: z.array(WebhookItem).min(1).max(100) }),
   WebhookItem.transform((item) => ({ assignments: [item] })),
 ]);
+
+// ─── Grades ───────────────────────────────────────────────────────────────
+
+const weight = z.coerce.number().min(0, "Weight can't be negative.").max(100, "Weight can't be over 100%.");
+
+export const CreateComponentsRequest = z.object({
+  components: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1, "Give each part a name.").max(200),
+        weight,
+        description: z.string().trim().max(2000).nullish(),
+      }),
+    )
+    .min(1)
+    .max(30),
+  /** Delete this course's existing parts (and their scores) first. */
+  replace: z.boolean().default(false),
+});
+
+export const UpdateComponentRequest = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  weight: weight.optional(),
+});
+
+export const CreateGradeItemRequest = z
+  .object({
+    component_id: z.string().uuid(),
+    title: z.string().trim().min(1, "Name this result, e.g. Quiz 1.").max(200),
+    score: z.coerce.number().min(0, "Score can't be negative."),
+    max_score: z.coerce.number().positive("Out of must be more than 0."),
+    taken_on: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullish()
+      .or(z.literal("")),
+    notes: z.string().trim().max(2000).nullish(),
+  })
+  .refine((i) => i.score <= i.max_score * 1.5, { message: "Score looks bigger than the maximum.", path: ["score"] });
+
+export const UpdateCourseTargetRequest = z.object({
+  target_percent: z.coerce.number().min(0).max(100),
+});
+
+export const ParseOutlineRequest = z.object({
+  course_code: z.string().trim().min(5).max(10),
+  text: z.string().trim().max(100_000).default(""),
+});
+
+/** What the AI extracts from a course outline / syllabus. */
+export const ParsedOutlineSchema = z.object({
+  course_name: z.string().nullable().describe("Full course name if stated, else null."),
+  professor: z.string().nullable().describe("Instructor name(s) if stated, else null."),
+  components: z
+    .array(
+      z.object({
+        name: z.string().describe("Graded part, e.g. 'Midterm exam', 'Quizzes', 'Group project', 'Class participation'."),
+        weight: z.number().describe("Percent of the final grade, e.g. 30 for 30%."),
+        description: z.string().nullable().describe("Short detail: number of quizzes, format, date if given. Else null."),
+      }),
+    )
+    .describe("The grading breakdown. Weights should add up to 100."),
+  deadlines: z.array(
+    z.object({
+      title: z.string(),
+      due_date: z.string().nullable().describe("ISO 8601 with +07:00 offset, or null if no exact date."),
+      description: z.string().nullable(),
+    }),
+  ),
+});
+export type ParsedOutline = z.infer<typeof ParsedOutlineSchema>;

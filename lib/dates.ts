@@ -1,5 +1,3 @@
-const TZ = "Asia/Bangkok";
-
 export type UrgencyBucket = "overdue" | "within48h" | "thisWeek" | "later" | "noDate";
 
 export const BUCKET_LABELS: Record<UrgencyBucket, string> = {
@@ -23,24 +21,47 @@ export function urgencyBucket(dueDate: string | null, now = Date.now()): Urgency
   return "later";
 }
 
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/**
+ * Date pieces in Bangkok time (UTC+7, no daylight saving). We build display
+ * strings ourselves because Node and browsers word Intl output differently
+ * ("Wed, 21 Oct" vs "Wed 21 Oct", "Sep" vs "Sept"), which would make server-
+ * and client-rendered text disagree.
+ */
+function bangkok(d: Date) {
+  const t = new Date(d.getTime() + 7 * 3600 * 1000);
+  return {
+    year: t.getUTCFullYear(),
+    month: t.getUTCMonth(),
+    day: t.getUTCDate(),
+    weekday: t.getUTCDay(),
+    time: `${String(t.getUTCHours()).padStart(2, "0")}:${String(t.getUTCMinutes()).padStart(2, "0")}`,
+  };
+}
+
+/** "Wed 21 Oct, 23:59" */
 export function formatDue(dueDate: string | null): string {
   if (!dueDate) return "No due date";
   const d = new Date(dueDate);
   if (Number.isNaN(d.getTime())) return "No due date";
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: TZ,
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
+  const b = bangkok(d);
+  return `${DAYS[b.weekday].slice(0, 3)} ${b.day} ${MONTHS[b.month].slice(0, 3)}, ${b.time}`;
 }
 
+/** "21 Oct 2026" */
 export function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-GB", { timeZone: TZ, day: "numeric", month: "short", year: "numeric" }).format(
-    new Date(iso),
-  );
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const b = bangkok(d);
+  return `${b.day} ${MONTHS[b.month].slice(0, 3)} ${b.year}`;
+}
+
+/** "Wednesday, 21 October 2026" */
+export function formatLongDate(d: Date | number): string {
+  const b = bangkok(new Date(d));
+  return `${DAYS[b.weekday]}, ${b.day} ${MONTHS[b.month]} ${b.year}`;
 }
 
 /** "in 5h", "in 3d", "2d ago" */

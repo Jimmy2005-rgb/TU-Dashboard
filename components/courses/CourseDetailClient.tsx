@@ -10,6 +10,7 @@ import {
   Circle,
   ExternalLink,
   FileText,
+  History,
   Link2,
   Loader2,
   Play,
@@ -17,12 +18,14 @@ import {
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { PlatformBadge, Tag } from "@/components/ui/badges";
 import { api } from "@/components/ui/api";
 import { formatDate, formatDue } from "@/lib/dates";
-import type { Assignment, Course, CourseMaterial, PracticeSession, QuizQuestion } from "@/lib/types";
+import { fmtPct, letterFor, summarize } from "@/lib/grades";
+import type { Assignment, Course, CourseMaterial, GradeComponent, GradeItem, PracticeSession, QuizQuestion } from "@/lib/types";
 import AddCourseButton from "./AddCourseButton";
+import GradesPanel from "./GradesPanel";
 import TutorPanel from "./TutorPanel";
 
 export default function CourseDetailClient({
@@ -31,6 +34,8 @@ export default function CourseDetailClient({
   initialMaterials,
   questions,
   sessions,
+  gradeComponents,
+  gradeItems,
   aiEnabled,
 }: {
   course: Course;
@@ -38,6 +43,8 @@ export default function CourseDetailClient({
   initialMaterials: CourseMaterial[];
   questions: QuizQuestion[];
   sessions: PracticeSession[];
+  gradeComponents: GradeComponent[];
+  gradeItems: GradeItem[];
   aiEnabled: boolean;
 }) {
   const [tutorOpen, setTutorOpen] = useState(false);
@@ -50,6 +57,12 @@ export default function CourseDetailClient({
   const done = assignments.filter((a) => a.status === "completed").length;
   const pct = assignments.length ? Math.round((done / assignments.length) * 100) : 0;
   const upcoming = assignments.filter((a) => a.status === "pending");
+  const grade = useMemo(() => summarize(gradeComponents, gradeItems), [gradeComponents, gradeItems]);
+  const componentName = useMemo(() => new Map(gradeComponents.map((c) => [c.id, c.name])), [gradeComponents]);
+  const results = useMemo(
+    () => [...gradeItems].sort((a, b) => (b.taken_on ?? b.created_at).localeCompare(a.taken_on ?? a.created_at)),
+    [gradeItems],
+  );
   const avgScore = sessions.length
     ? Math.round((sessions.reduce((s, x) => s + x.score / x.total_questions, 0) / sessions.length) * 100)
     : null;
@@ -122,14 +135,22 @@ export default function CourseDetailClient({
             <div className="h-full rounded-full bg-tu-600" style={{ width: `${pct}%` }} />
           </div>
         </Stat>
-        <Stat label="Pending" value={String(upcoming.length)} sub="tasks left" />
+        <Stat
+          label="Grade so far"
+          value={grade.currentPercent == null ? "—" : `${fmtPct(grade.currentPercent, 0)} ${letterFor(grade.currentPercent)}`}
+          sub={grade.gradedWeight > 0 ? `${fmtPct(grade.gradedWeight, 0)} of course graded` : "add scores below"}
+        />
         <Stat label="Saved questions" value={String(questions.length)} sub="in the vault" />
         <Stat label="Practice avg" value={avgScore == null ? "—" : `${avgScore}%`} sub={`last ${sessions.length} sessions`} />
       </div>
 
       {error && <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+      <div className="mt-5">
+        <GradesPanel course={course} initialComponents={gradeComponents} initialItems={gradeItems} aiEnabled={aiEnabled} />
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
         {/* Assignments */}
         <section className="card p-5">
           <h2 className="flex items-center gap-2 font-semibold">
@@ -220,6 +241,63 @@ export default function CourseDetailClient({
         </section>
       </div>
 
+      {/* Score history */}
+      <section className="card mt-4 p-5">
+        <h2 className="flex items-center gap-2 font-semibold">
+          <History className="h-5 w-5 text-tu-600" /> Score history
+        </h2>
+        <div className="mt-3 grid gap-5 lg:grid-cols-2">
+          <div>
+            <p className="label">Exams, quizzes &amp; assignments</p>
+            {results.length === 0 ? (
+              <p className="text-sm text-slate-500">Your real results appear here once you add scores in Grades above.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {results.map((r) => {
+                  const p = (Number(r.score) / Number(r.max_score)) * 100;
+                  return (
+                    <li key={r.id} className="flex items-center gap-3 py-2 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-slate-800">{r.title}</p>
+                        <p className="text-[11px] text-slate-400">
+                          {componentName.get(r.component_id) ?? ""}
+                          {r.taken_on ? ` · ${formatDate(r.taken_on)}` : ""}
+                        </p>
+                      </div>
+                      <span className="shrink-0 font-mono text-xs text-slate-600">
+                        {Number(r.score)}/{Number(r.max_score)}
+                      </span>
+                      <ScorePill pct={p} />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+          <div>
+            <p className="label">Practice quizzes (Quiz Vault)</p>
+            {sessions.length === 0 ? (
+              <p className="text-sm text-slate-500">Practice in the Quiz Vault and your scores will show here.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {sessions.map((sess) => (
+                  <li key={sess.id} className="flex items-center gap-3 py-2 text-sm">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-slate-800">{formatDate(sess.created_at)}</p>
+                      {sess.summary && <p className="truncate text-[11px] text-slate-400">{sess.summary}</p>}
+                    </div>
+                    <span className="shrink-0 font-mono text-xs text-slate-600">
+                      {sess.score}/{sess.total_questions}
+                    </span>
+                    <ScorePill pct={(sess.score / sess.total_questions) * 100} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* Saved questions */}
       <section className="card mt-4 p-5">
         <div className="flex items-center justify-between">
@@ -264,11 +342,6 @@ export default function CourseDetailClient({
             ))}
           </ul>
         )}
-        {sessions.length > 0 && (
-          <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
-            Last practice: {formatDate(sessions[0].created_at)} — {sessions[0].summary}
-          </p>
-        )}
       </section>
 
       <TutorPanel course={course} open={tutorOpen} onClose={() => setTutorOpen(false)} />
@@ -284,5 +357,18 @@ function Stat({ label, value, sub, children }: { label: string; value: string; s
       <p className="mt-1 text-[11px] text-slate-400">{sub}</p>
       {children}
     </div>
+  );
+}
+
+function ScorePill({ pct }: { pct: number }) {
+  return (
+    <span
+      className={clsx(
+        "w-12 shrink-0 rounded-md px-1.5 py-0.5 text-center text-xs font-semibold",
+        pct >= 80 ? "bg-emerald-50 text-emerald-700" : pct >= 60 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700",
+      )}
+    >
+      {Math.round(pct)}%
+    </span>
   );
 }

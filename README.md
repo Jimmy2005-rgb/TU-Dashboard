@@ -15,6 +15,8 @@ A personal web app for Thammasat University BBA students. It brings MS Teams and
 | **Dashboard** `/dashboard` | Deadlines grouped by urgency: Overdue, < 48 Hours, This Week, Later, No Due Date. Filter by platform (Teams / Classroom / Manual) or course code. One click marks an item complete, with an optimistic update saved to Supabase. **Quick Add / Paste Syllabus** sends raw text to the AI, which extracts every deadline and saves them. |
 | **Quiz Vault** `/practice` | **Drop / Paste Quiz:** paste scraped Google Forms, Moodle or PDF text and the AI turns it into questions, options, answers and step-by-step explanations. **Practice mode** gives instant feedback, explanations and a score, and keeps a history of your sessions. **Generate AI Variation Quiz** writes new numerical or scenario versions of your questions, starting with the ones you missed. |
 | **Course Hub** `/courses/[code]` | Course progress, saved materials (links and notes), saved questions, practice average, and a slide-over **AI tutor** set up for that course. It answers in Thai or English. |
+| **Grades** (on each course page) | The course's grading breakdown (e.g. Midterm 30%, Final 40%, Quizzes 10%, Project 20%). **Import course outline (AI)** reads the weights and exam dates from a dropped outline PDF or photo, and you review them before saving. Record your actual scores (e.g. Midterm 42/60) to see your grade so far, an estimated TU letter grade, the range you can still finish in, and the average you need on the remaining parts to reach your target. The **Score history** lists your real results and your practice-quiz scores. |
+| **File drop** | Paste Syllabus, Paste Quiz and Import course outline accept **PDFs and photos/screenshots** (up to 4 MB) as well as pasted text. |
 | **Webhook** `/api/webhooks/incoming-assignment` | Takes JSON from Make.com or n8n, protected by a secret header. You can send structured fields or raw text for the AI to parse. Items are upserted by `external_id`, so retries don't create duplicates. |
 | **Access control** | Set `APP_PASSWORD` to put a single password in front of every page and API route. This stops other people from reading your data or using up your AI quota. |
 
@@ -108,6 +110,7 @@ Open http://localhost:3000.
 
 1. Create a free project at [supabase.com](https://supabase.com) → **New project**. Pick the Singapore region (`ap-southeast-1`), the closest one to Bangkok.
 2. Open **SQL Editor → New query**, paste the whole of [`supabase/schema.sql`](supabase/schema.sql), and click **Run**. The script is idempotent, so running it again is safe.
+   - **Already set up before the Grades feature?** Also run [`supabase/migrations/002_grades.sql`](supabase/migrations/002_grades.sql) once. It adds the grades tables; `schema.sql` already includes it for new setups.
 3. Optional: run [`supabase/seed.sql`](supabase/seed.sql) the same way to add sample courses (AC201, AC202, FN201, MK201, OM201) and a few practice questions. Edit the names to match your actual enrolment.
 4. Go to **Project Settings → API** and copy:
    - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`

@@ -4,7 +4,7 @@ import CourseDetailClient from "@/components/courses/CourseDetailClient";
 import SetupNotice from "@/components/SetupNotice";
 import { aiProvider } from "@/lib/ai";
 import { getOwnerId, getSupabaseAdmin, normalizeCourseCode } from "@/lib/supabase";
-import type { Assignment, Course, CourseMaterial, PracticeSession, QuizQuestion } from "@/lib/types";
+import type { Assignment, Course, CourseMaterial, GradeComponent, GradeItem, PracticeSession, QuizQuestion } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export default async function CoursePage({ params }: { params: { code: string } 
   }
   const userId = getOwnerId();
 
-  const [course, assignments, materials, questions, sessions] = await Promise.all([
+  const [course, assignments, materials, questions, sessions, components] = await Promise.all([
     db.from("courses").select("*").eq("course_code", code).maybeSingle<Course>(),
     db
       .from("assignments")
@@ -45,10 +45,22 @@ export default async function CoursePage({ params }: { params: { code: string } 
       .eq("user_id", userId)
       .eq("course_code", code)
       .order("created_at", { ascending: false })
-      .limit(5),
+      .limit(20),
+    db
+      .from("grade_components")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("course_code", code)
+      .order("sort_order", { ascending: true }),
   ]);
 
-  const error = course.error ?? assignments.error ?? materials.error ?? questions.error ?? sessions.error;
+  const componentIds = (components.data ?? []).map((c) => c.id as string);
+  const gradeItems = componentIds.length
+    ? await db.from("grade_items").select("*").in("component_id", componentIds).order("taken_on", { ascending: true })
+    : { data: [], error: null };
+
+  const error =
+    course.error ?? assignments.error ?? materials.error ?? questions.error ?? sessions.error ?? components.error ?? gradeItems.error;
   if (error) return <SetupNotice message={`Database error: ${error.message}`} />;
   if (!course.data) notFound();
 
@@ -59,6 +71,8 @@ export default async function CoursePage({ params }: { params: { code: string } 
       initialMaterials={(materials.data ?? []) as CourseMaterial[]}
       questions={(questions.data ?? []) as QuizQuestion[]}
       sessions={(sessions.data ?? []) as PracticeSession[]}
+      gradeComponents={(components.data ?? []) as GradeComponent[]}
+      gradeItems={(gradeItems.data ?? []) as GradeItem[]}
       aiEnabled={aiProvider() !== null}
     />
   );

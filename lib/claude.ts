@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type * as z from "zod";
-import { AiError, type ChatOptions, type ExtractOptions } from "./ai-shared";
+import { AiError, type AiFile, type ChatOptions, type ExtractOptions } from "./ai-shared";
 
 /**
  * Optional paid provider. Used instead of Gemini when ANTHROPIC_API_KEY is set.
@@ -23,6 +23,23 @@ function getClaude(): Anthropic {
   return client;
 }
 
+const CLAUDE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
+type ClaudeImageType = (typeof CLAUDE_IMAGE_TYPES)[number];
+
+/** PDFs become document blocks and photos image blocks, placed before the text. */
+function toClaudeContent(input: string, files: AiFile[] = []): Anthropic.Beta.BetaContentBlockParam[] {
+  const blocks: Anthropic.Beta.BetaContentBlockParam[] = files.map((f) => {
+    if (f.mimeType === "application/pdf") {
+      return { type: "document", source: { type: "base64", media_type: "application/pdf", data: f.data } };
+    }
+    if (!CLAUDE_IMAGE_TYPES.includes(f.mimeType as ClaudeImageType)) {
+      throw new AiError(`${f.name}: Claude can't read this file type. Use PDF, JPG, PNG or WebP.`, 415);
+    }
+    return { type: "image", source: { type: "base64", media_type: f.mimeType as ClaudeImageType, data: f.data } };
+  });
+  return [...blocks, { type: "text", text: input }];
+}
+
 /** Structured extraction: Claude returns JSON guaranteed to match `schema`. */
 export async function claudeExtract<S extends z.ZodType>(opts: ExtractOptions<S>): Promise<z.infer<S>> {
   const response = await getClaude().beta.messages.parse({
@@ -31,7 +48,7 @@ export async function claudeExtract<S extends z.ZodType>(opts: ExtractOptions<S>
     betas: [FALLBACK_BETA],
     fallbacks: "default",
     system: opts.system,
-    messages: [{ role: "user", content: opts.input }],
+    messages: [{ role: "user", content: opts.files?.length ? toClaudeContent(opts.input, opts.files) : opts.input }],
     output_config: {
       effort: opts.effort ?? "medium",
       format: betaZodOutputFormat(opts.schema),

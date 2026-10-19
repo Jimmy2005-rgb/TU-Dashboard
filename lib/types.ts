@@ -8,6 +8,7 @@ export interface Course {
   name: string;
   professor: string | null;
   semester: string | null;
+  target_percent: number;
   created_at: string;
 }
 
@@ -56,6 +57,29 @@ export interface CourseMaterial {
   course_code: string;
   title: string;
   url: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface GradeComponent {
+  id: string;
+  user_id: string;
+  course_code: string;
+  name: string;
+  weight: number;
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface GradeItem {
+  id: string;
+  user_id: string;
+  component_id: string;
+  title: string;
+  score: number;
+  max_score: number;
+  taken_on: string | null;
   notes: string | null;
   created_at: string;
 }

@@ -23,7 +23,12 @@ export function getSupabaseAdmin(): SupabaseClient {
 
   admin = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { "x-application-name": "tu-bba-academic-hub" } },
+    global: {
+      headers: { "x-application-name": "tu-bba-academic-hub" },
+      // Next.js caches fetch() by default; database reads must always be fresh,
+      // otherwise new assignments/scores can look like they vanished on reload.
+      fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+    },
   });
   return admin;
 }

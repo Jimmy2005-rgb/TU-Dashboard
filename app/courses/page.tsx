@@ -4,7 +4,8 @@ import Link from "next/link";
 import AddCourseButton from "@/components/courses/AddCourseButton";
 import SetupNotice from "@/components/SetupNotice";
 import { getOwnerId, getSupabaseAdmin } from "@/lib/supabase";
-import type { Course } from "@/lib/types";
+import { fmtPct, letterFor, summarize } from "@/lib/grades";
+import type { Course, GradeComponent, GradeItem } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Courses" };
 export const dynamic = "force-dynamic";
@@ -18,13 +19,16 @@ export default async function CoursesPage() {
   }
   const userId = getOwnerId();
 
-  const [courses, assignments, quiz, materials] = await Promise.all([
+  const [courses, assignments, quiz, materials, components, gradeItems] = await Promise.all([
     db.from("courses").select("*").order("course_code"),
     db.from("assignments").select("course_code, status").eq("user_id", userId),
     db.from("quiz_bank").select("course_code"),
     db.from("course_materials").select("course_code").eq("user_id", userId),
+    db.from("grade_components").select("*").eq("user_id", userId),
+    db.from("grade_items").select("*").eq("user_id", userId),
   ]);
-  const error = courses.error ?? assignments.error ?? quiz.error ?? materials.error;
+  const error =
+    courses.error ?? assignments.error ?? quiz.error ?? materials.error ?? components.error ?? gradeItems.error;
   if (error) return <SetupNotice message={`Database error: ${error.message}. Did you run supabase/schema.sql?`} />;
 
   const stats = new Map<string, { total: number; done: number; quiz: number; materials: number }>();
@@ -42,6 +46,12 @@ export default async function CoursesPage() {
   for (const m of materials.data ?? []) get(m.course_code).materials++;
 
   const list = (courses.data ?? []) as Course[];
+  const allParts = (components.data ?? []) as GradeComponent[];
+  const allItems = (gradeItems.data ?? []) as GradeItem[];
+  const gradeFor = (code: string) => {
+    const parts = allParts.filter((p) => p.course_code === code);
+    return parts.length ? summarize(parts, allItems.filter((i) => parts.some((p) => p.id === i.component_id))) : null;
+  };
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -62,6 +72,7 @@ export default async function CoursesPage() {
           {list.map((c) => {
             const s = stats.get(c.course_code) ?? { total: 0, done: 0, quiz: 0, materials: 0 };
             const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
+            const grade = gradeFor(c.course_code);
             return (
               <Link
                 key={c.id}
@@ -90,6 +101,16 @@ export default async function CoursesPage() {
                     <div className="h-full rounded-full bg-tu-600" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
+
+                {grade?.currentPercent != null && (
+                  <p className="mt-3 text-xs text-slate-500">
+                    Grade so far{" "}
+                    <span className="font-semibold text-slate-900">
+                      {fmtPct(grade.currentPercent, 0)} · {letterFor(grade.currentPercent)}
+                    </span>{" "}
+                    <span className="text-slate-400">({fmtPct(grade.gradedWeight, 0)} graded)</span>
+                  </p>
+                )}
 
                 <div className="mt-4 flex gap-4 text-xs text-slate-500">
                   <span className="flex items-center gap-1">

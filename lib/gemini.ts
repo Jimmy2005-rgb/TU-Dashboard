@@ -31,9 +31,10 @@ function toContents(messages: ChatOptions["messages"]): Content[] {
 
 /** Structured extraction: Gemini returns JSON constrained to `schema`, validated again with Zod. */
 export async function geminiExtract<S extends z.ZodType>(opts: ExtractOptions<S>): Promise<z.infer<S>> {
+  const fileParts = (opts.files ?? []).map((f) => ({ inlineData: { mimeType: f.mimeType, data: f.data } }));
   const response = await getGemini().models.generateContent({
     model: GEMINI_MODEL,
-    contents: opts.input,
+    contents: fileParts.length ? [{ role: "user", parts: [...fileParts, { text: opts.input }] }] : opts.input,
     config: {
       systemInstruction: opts.system,
       responseMimeType: "application/json",

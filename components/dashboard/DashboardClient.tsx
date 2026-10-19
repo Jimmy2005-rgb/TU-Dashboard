@@ -17,7 +17,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { CourseBadge, PlatformBadge } from "@/components/ui/badges";
 import { api } from "@/components/ui/api";
-import { BUCKET_LABELS, formatDue, relativeDue, urgencyBucket, type UrgencyBucket } from "@/lib/dates";
+import { BUCKET_LABELS, formatDue, formatLongDate, relativeDue, urgencyBucket, type UrgencyBucket } from "@/lib/dates";
 import { PLATFORM_LABELS, type Assignment, type Course, type SourcePlatform } from "@/lib/types";
 import AddAssignmentModal from "./AddAssignmentModal";
 import QuickAddModal from "./QuickAddModal";
@@ -129,7 +129,7 @@ export default function DashboardClient({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-sm text-slate-500">
-            {new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Bangkok", dateStyle: "full" }).format(now)}
+            {formatLongDate(now)}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

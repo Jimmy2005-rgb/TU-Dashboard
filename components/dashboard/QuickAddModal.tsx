@@ -2,6 +2,7 @@
 
 import { CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
+import FileDrop from "@/components/ui/FileDrop";
 import Modal from "@/components/ui/Modal";
 import { CourseBadge } from "@/components/ui/badges";
 import { api } from "@/components/ui/api";
@@ -27,6 +28,7 @@ export default function QuickAddModal({
   onCreated: (assignments: Assignment[]) => void;
 }) {
   const [text, setText] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [platform, setPlatform] = useState<SourcePlatform>("manual");
   const [defaultCourse, setDefaultCourse] = useState("");
   const [loading, setLoading] = useState(false);
@@ -47,14 +49,18 @@ export default function QuickAddModal({
     setError(null);
     setMessage(null);
     try {
-      const res = await api<{ assignments: Assignment[]; message?: string }>("/api/parse-assignment", {
-        body: { text, source_platform: platform, default_course_code: defaultCourse || null },
-      });
+      const form = new FormData();
+      form.set("text", text);
+      form.set("source_platform", platform);
+      if (defaultCourse) form.set("default_course_code", defaultCourse);
+      files.forEach((f) => form.append("files", f));
+      const res = await api<{ assignments: Assignment[]; message?: string }>("/api/parse-assignment", { body: form });
       setCreated(res.assignments);
       setMessage(res.message ?? null);
       if (res.assignments.length) {
         onCreated(res.assignments);
         setText("");
+        setFiles([]);
       }
     } catch (err) {
       setError((err as Error).message);
@@ -67,7 +73,7 @@ export default function QuickAddModal({
     <Modal
       open={open}
       onClose={close}
-      title="Quick Add / Paste Syllabus"
+      title="Paste or Drop Syllabus"
       description="AI extracts every deadline and saves it to your dashboard."
       wide
     >
@@ -98,8 +104,12 @@ export default function QuickAddModal({
         </div>
       ) : (
         <div className="space-y-3">
+          <FileDrop files={files} onChange={setFiles} disabled={loading} hint="Syllabus PDF, course outline, or a photo of an announcement" />
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <span className="h-px flex-1 bg-slate-200" /> or paste text <span className="h-px flex-1 bg-slate-200" />
+          </div>
           <textarea
-            className="input min-h-[260px] font-mono text-xs leading-relaxed"
+            className="input min-h-[180px] font-mono text-xs leading-relaxed"
             placeholder={PLACEHOLDER}
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -132,7 +142,7 @@ export default function QuickAddModal({
             <button className="btn-ghost" onClick={close} disabled={loading}>
               Cancel
             </button>
-            <button className="btn-primary" onClick={submit} disabled={loading || text.trim().length < 5}>
+            <button className="btn-primary" onClick={submit} disabled={loading || (text.trim().length < 5 && files.length === 0)}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               {loading ? "AI is reading…" : "Extract & Save"}
             </button>

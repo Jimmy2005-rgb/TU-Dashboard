@@ -2,6 +2,7 @@
 
 import { CheckCircle2, ClipboardPaste, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import FileDrop from "@/components/ui/FileDrop";
 import Modal from "@/components/ui/Modal";
 import { api } from "@/components/ui/api";
 import type { QuizQuestion } from "@/lib/types";
@@ -33,6 +34,7 @@ export default function PasteQuizModal({
   onCreated: (questions: QuizQuestion[]) => void;
 }) {
   const [text, setText] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [course, setCourse] = useState(defaultCourse);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,13 +55,16 @@ export default function PasteQuizModal({
     setLoading(true);
     setError(null);
     try {
-      const res = await api<{ questions: QuizQuestion[]; message?: string }>("/api/parse-quiz", {
-        body: { text, course_code: course },
-      });
+      const form = new FormData();
+      form.set("text", text);
+      form.set("course_code", course);
+      files.forEach((f) => form.append("files", f));
+      const res = await api<{ questions: QuizQuestion[]; message?: string }>("/api/parse-quiz", { body: form });
       setResult({ count: res.questions.length, message: res.message });
       if (res.questions.length) {
         onCreated(res.questions);
         setText("");
+        setFiles([]);
       }
     } catch (err) {
       setError((err as Error).message);
@@ -109,8 +114,12 @@ export default function PasteQuizModal({
               ))}
             </datalist>
           </div>
+          <FileDrop files={files} onChange={setFiles} disabled={loading} hint="Quiz or exam PDF, or a photo/screenshot of questions" />
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <span className="h-px flex-1 bg-slate-200" /> or paste text <span className="h-px flex-1 bg-slate-200" />
+          </div>
           <textarea
-            className="input min-h-[280px] font-mono text-xs leading-relaxed"
+            className="input min-h-[200px] font-mono text-xs leading-relaxed"
             placeholder={PLACEHOLDER}
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -124,7 +133,7 @@ export default function PasteQuizModal({
               <button className="btn-ghost" onClick={close} disabled={loading}>
                 Cancel
               </button>
-              <button className="btn-primary" onClick={submit} disabled={loading || text.trim().length < 10 || course.length < 5}>
+              <button className="btn-primary" onClick={submit} disabled={loading || (text.trim().length < 10 && files.length === 0) || course.length < 5}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardPaste className="h-4 w-4" />}
                 {loading ? "Structuring…" : "Parse & Save"}
               </button>

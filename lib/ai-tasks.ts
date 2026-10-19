@@ -1,7 +1,10 @@
 import { bangkokNow, extractStructured } from "./ai";
+import type { AiFile } from "./ai-shared";
 import { parseIncomingDate } from "./dates";
 import {
   ParsedAssignmentsSchema,
+  ParsedOutlineSchema,
+  type ParsedOutline,
   ParsedQuizSchema,
   type NormalizedQuestion,
   type ParsedAssignments,
@@ -14,7 +17,7 @@ import type { Course, QuizQuestion } from "./types";
 
 const ASSIGNMENT_SYSTEM = `You extract coursework deadlines for a Thammasat University BBA student.
 
-Input is raw text: a syllabus, a course schedule, an LMS notification from Microsoft Teams or Google Classroom, an email, or a chat message. Return every gradable task or deadline you find: assignments, problem sets, quizzes, midterm/final exams, presentations, reports, case write-ups, readings that must be submitted.
+Input is raw text and/or attached files (PDFs, photos or screenshots): a syllabus, a course outline, a course schedule, an LMS notification from Microsoft Teams or Google Classroom, an email, or a chat message. Return every gradable task or deadline you find: assignments, problem sets, quizzes, midterm/final exams, presentations, reports, case write-ups, readings that must be submitted.
 
 Rules:
 - One entry per distinct deliverable. Do not invent tasks that are not in the text.
@@ -27,17 +30,19 @@ Rules:
 export async function parseAssignmentsWithAI(
   text: string,
   defaultCourseCode?: string | null,
+  files: AiFile[] = [],
 ): Promise<ParsedAssignments> {
   const input = [
     `Current date: ${bangkokNow()}`,
     `Default course code: ${defaultCourseCode || "none"}`,
+    files.length ? `Attached files: ${files.map((f) => f.name).join(", ")}` : "",
     "",
     "<text>",
-    text,
+    text || "(no pasted text — read the attached files)",
     "</text>",
   ].join("\n");
 
-  const result = await extractStructured({ system: ASSIGNMENT_SYSTEM, input, schema: ParsedAssignmentsSchema });
+  const result = await extractStructured({ system: ASSIGNMENT_SYSTEM, input, schema: ParsedAssignmentsSchema, files });
 
   return {
     courses_detected: result.courses_detected
@@ -57,7 +62,7 @@ export async function parseAssignmentsWithAI(
 
 const QUIZ_SYSTEM = `You turn messy pasted quiz text into a clean question bank for a Thammasat University BBA student.
 
-The input may be scraped from Google Forms, Microsoft Forms, Moodle, PDFs, or lecture slides: expect stray UI text ("Required", "1 point", "Clear selection"), broken line wraps, numbering, and answer letters. Ignore the noise.
+The input may be pasted text or attached files (PDFs, photos, screenshots) from Google Forms, Microsoft Forms, Moodle, exam papers or lecture slides: expect stray UI text ("Required", "1 point", "Clear selection"), broken line wraps, numbering, and answer letters. Ignore the noise.
 
 For every question:
 - question_text: the complete stem, with any data or table needed to solve it. Fix obvious formatting breaks but do not change meaning or numbers.
@@ -103,9 +108,9 @@ export function normalizeQuestion(q: ParsedQuestion): NormalizedQuestion {
   };
 }
 
-export async function parseQuizWithAI(text: string, course: Pick<Course, "course_code" | "name">) {
-  const input = `Course: ${course.course_code} — ${course.name}\n\n<quiz_text>\n${text}\n</quiz_text>`;
-  const result = await extractStructured({ system: QUIZ_SYSTEM, input, schema: ParsedQuizSchema });
+export async function parseQuizWithAI(text: string, course: Pick<Course, "course_code" | "name">, files: AiFile[] = []) {
+  const input = `Course: ${course.course_code} — ${course.name}\n\n<quiz_text>\n${text || "(no pasted text — read the attached files)"}\n</quiz_text>`;
+  const result = await extractStructured({ system: QUIZ_SYSTEM, input, schema: ParsedQuizSchema, files });
   return result.questions.map(normalizeQuestion).filter((q) => q.question_text && q.correct_answer);
 }
 
@@ -133,6 +138,54 @@ export async function generateVariationsWithAI(
     .map(normalizeQuestion)
     .map((q) => ({ ...q, tags: Array.from(new Set([...q.tags, "ai-variation"])) }))
     .slice(0, count);
+}
+
+// ─── Course outline ───────────────────────────────────────────────────────
+
+const OUTLINE_SYSTEM = `You read a course outline / syllabus for a Thammasat University BBA student and extract how the course is graded.
+
+Input is pasted text and/or attached files (PDFs, photos or screenshots of the outline).
+
+components — the grading breakdown:
+- One entry per graded part exactly as the outline lists it, e.g. "Midterm exam" 30, "Final exam" 35, "Quizzes" 10, "Group project" 15, "Class participation" 10.
+- weight is the percent of the final grade as a number (30 for 30%). If the outline gives points instead of percents, convert to percents of the total.
+- If a part is split (e.g. "Quizzes 10% (best 4 of 5)"), keep it as one part and put the detail in description.
+- Weights normally add up to 100. Do not invent parts; if the outline has no grading breakdown, return an empty list.
+
+deadlines — exams and due dates that have an exact date. Resolve dates against the current date supplied; convert Thai/Buddhist-era years (e.g. 2569) to Gregorian (subtract 543). Use 23:59 when only a date is given; ISO 8601 with +07:00. Skip items with no exact date.
+
+course_name and professor: as written in the outline, or null.`;
+
+export async function parseOutlineWithAI(
+  text: string,
+  course: Pick<Course, "course_code" | "name">,
+  files: AiFile[] = [],
+): Promise<ParsedOutline> {
+  const input = [
+    `Current date: ${bangkokNow()}`,
+    `Course: ${course.course_code} — ${course.name}`,
+    files.length ? `Attached files: ${files.map((f) => f.name).join(", ")}` : "",
+    "",
+    "<outline>",
+    text || "(no pasted text — read the attached files)",
+    "</outline>",
+  ].join("\n");
+
+  const result = await extractStructured({ system: OUTLINE_SYSTEM, input, schema: ParsedOutlineSchema, files });
+  return {
+    course_name: result.course_name?.trim() || null,
+    professor: result.professor?.trim() || null,
+    components: result.components
+      .map((c) => ({
+        name: c.name.trim().slice(0, 200),
+        weight: Math.round(Math.min(100, Math.max(0, Number(c.weight) || 0)) * 100) / 100,
+        description: c.description?.trim() || null,
+      }))
+      .filter((c) => c.name),
+    deadlines: result.deadlines
+      .map((d) => ({ title: d.title.trim().slice(0, 500), due_date: parseIncomingDate(d.due_date), description: d.description?.trim() || null }))
+      .filter((d) => d.title && d.due_date),
+  };
 }
 
 // ─── Tutor ────────────────────────────────────────────────────────────────

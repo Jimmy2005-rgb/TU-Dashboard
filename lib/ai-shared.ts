@@ -12,12 +12,21 @@ export class AiError extends Error {
 
 export type Effort = "low" | "medium" | "high";
 
+/** A document or photo sent to the model alongside the text prompt. */
+export interface AiFile {
+  name: string;
+  mimeType: string;
+  /** Base64-encoded file contents. */
+  data: string;
+}
+
 export interface ExtractOptions<S extends z.ZodType> {
   system: string;
   input: string;
   schema: S;
   effort?: Effort;
   maxTokens?: number;
+  files?: AiFile[];
 }
 
 export interface ChatOptions {

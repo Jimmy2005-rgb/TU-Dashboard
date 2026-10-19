@@ -1,28 +1,31 @@
 import { NextResponse } from "next/server";
 import { parseAssignmentsWithAI } from "@/lib/ai-tasks";
 import { aiErrorStatus, describeAiError } from "@/lib/ai";
-import { jsonError, readJson } from "@/lib/http";
+import { jsonError } from "@/lib/http";
 import { ParseAssignmentRequest } from "@/lib/schemas";
 import { ensureCourses, getOwnerId, getSupabaseAdmin } from "@/lib/supabase";
 import type { Assignment } from "@/lib/types";
+import { readAiRequest } from "@/lib/uploads";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 /**
  * POST /api/parse-assignment
- * Body: { text, source_platform?, default_course_code? }
+ * Body: JSON or multipart form with { text?, source_platform?, default_course_code?, files? }
+ * (files: PDFs or photos, 4 MB total).
  * The AI turns a syllabus / notification / email into structured deadlines,
  * which are saved straight to the `assignments` table.
  */
 export async function POST(req: Request) {
-  const parsed = await readJson(req, ParseAssignmentRequest);
+  const parsed = await readAiRequest(req, ParseAssignmentRequest);
   if (parsed.error) return parsed.error;
   const { text, source_platform, default_course_code } = parsed.data;
+  if (text.length < 5 && parsed.files.length === 0) return jsonError("Paste some text or drop a file first.");
 
   let result;
   try {
-    result = await parseAssignmentsWithAI(text, default_course_code);
+    result = await parseAssignmentsWithAI(text, default_course_code, parsed.files);
   } catch (err) {
     console.error("[parse-assignment] AI error", err);
     return jsonError(describeAiError(err), aiErrorStatus(err));

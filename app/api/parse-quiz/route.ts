@@ -1,23 +1,25 @@
 import { NextResponse } from "next/server";
 import { parseQuizWithAI } from "@/lib/ai-tasks";
 import { aiErrorStatus, describeAiError } from "@/lib/ai";
-import { jsonError, readJson } from "@/lib/http";
+import { jsonError } from "@/lib/http";
 import { ParseQuizRequest } from "@/lib/schemas";
 import { ensureCourses, getSupabaseAdmin, normalizeCourseCode } from "@/lib/supabase";
 import type { Course, QuizQuestion } from "@/lib/types";
+import { readAiRequest } from "@/lib/uploads";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 /**
  * POST /api/parse-quiz
- * Body: { text, course_code }
+ * Body: JSON or multipart form with { text?, course_code, files? } (PDFs or photos).
  * The AI cleans scraped quiz text into questions, options, answers and worked
  * explanations, saved to `quiz_bank`.
  */
 export async function POST(req: Request) {
-  const parsed = await readJson(req, ParseQuizRequest);
+  const parsed = await readAiRequest(req, ParseQuizRequest);
   if (parsed.error) return parsed.error;
+  if (parsed.data.text.length < 10 && parsed.files.length === 0) return jsonError("Paste some quiz text or drop a file first.");
 
   const courseCode = normalizeCourseCode(parsed.data.course_code);
   if (!courseCode) return jsonError("Course code must look like FN201.");
@@ -32,7 +34,7 @@ export async function POST(req: Request) {
 
   let questions;
   try {
-    questions = await parseQuizWithAI(parsed.data.text, course ?? { course_code: courseCode, name: courseCode });
+    questions = await parseQuizWithAI(parsed.data.text, course ?? { course_code: courseCode, name: courseCode }, parsed.files);
   } catch (err) {
     console.error("[parse-quiz] AI error", err);
     return jsonError(describeAiError(err), aiErrorStatus(err));
