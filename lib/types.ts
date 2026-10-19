@@ -9,6 +9,8 @@ export interface Course {
   professor: string | null;
   semester: string | null;
   target_percent: number;
+  /** Colour slot 1–7, or null for automatic. */
+  color: number | null;
   created_at: string;
 }
 

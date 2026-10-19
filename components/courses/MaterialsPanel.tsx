@@ -289,7 +289,7 @@ export default function MaterialsPanel({
       {uploads.length > 0 && (
         <ul className="mt-2 space-y-1.5">
           {uploads.map((u) => (
-            <li key={u.id} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
+            <li key={u.id} className="rounded-md border border-slate-200 bg-surface px-3 py-2 text-sm">
               <div className="flex items-center gap-2">
                 {u.error ? <X className="h-4 w-4 shrink-0 text-red-500" /> : <Loader2 className="h-4 w-4 shrink-0 animate-spin text-tu-600" />}
                 <span className="min-w-0 flex-1 truncate">{u.name}</span>

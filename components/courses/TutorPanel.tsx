@@ -95,8 +95,8 @@ export default function TutorPanel({ course, open, onClose }: { course: Course; 
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={`${course.course_code} tutor`}>
-      <div className="absolute inset-0 animate-fade-in bg-slate-900/40" onClick={onClose} />
-      <aside className="relative flex h-full w-full max-w-xl animate-slide-in flex-col bg-white shadow-2xl">
+      <div className="absolute inset-0 animate-fade-in bg-black/40" onClick={onClose} />
+      <aside className="relative flex h-full w-full max-w-xl animate-slide-in flex-col bg-surface shadow-2xl">
         <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-tu-600 text-gold-500">

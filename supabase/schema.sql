@@ -227,3 +227,7 @@ create index if not exists course_materials_kind_idx
 insert into storage.buckets (id, name, public, file_size_limit)
 values ('course-files', 'course-files', false, 52428800)
 on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit;
+
+-- ─── Course colours ─────────────────────────────────────────────────────
+alter table public.courses
+  add column if not exists color smallint check (color is null or color between 1 and 7);

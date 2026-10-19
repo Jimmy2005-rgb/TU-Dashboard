@@ -88,7 +88,7 @@ export default function FileDrop({
       {files.length > 0 && (
         <ul className="mt-2 space-y-1">
           {files.map((f, i) => (
-            <li key={`${f.name}-${i}`} className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm">
+            <li key={`${f.name}-${i}`} className="flex items-center gap-2 rounded-md border border-slate-200 bg-surface px-2.5 py-1.5 text-sm">
               {f.type === "application/pdf" || /\.pdf$/i.test(f.name) ? (
                 <FileText className="h-4 w-4 shrink-0 text-tu-600" />
               ) : (

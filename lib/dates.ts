@@ -64,6 +64,21 @@ export function formatLongDate(d: Date | number): string {
   return `${DAYS[b.weekday]}, ${b.day} ${MONTHS[b.month]} ${b.year}`;
 }
 
+/** Monday 00:00 → next Monday 00:00 (Bangkok) for the week containing `now`, as epoch ms. */
+export function bangkokWeekRange(now: number): [number, number] {
+  const OFFSET = 7 * 3600 * 1000;
+  const local = new Date(now + OFFSET); // shifted so UTC getters read Bangkok wall time
+  const daysSinceMonday = (local.getUTCDay() + 6) % 7;
+  const start = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - daysSinceMonday) - OFFSET;
+  return [start, start + 7 * 24 * 3600 * 1000];
+}
+
+/** "Good morning" / "Good afternoon" / "Good evening" for Bangkok time. */
+export function greeting(now: number): string {
+  const hour = new Date(now + 7 * 3600 * 1000).getUTCHours();
+  return hour < 5 ? "Working late" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+}
+
 /** Values for <input type="date"> and <input type="time"> in Bangkok time. */
 export function toBangkokInputs(iso: string | null): { date: string; time: string } {
   if (!iso) return { date: "", time: "23:59" };

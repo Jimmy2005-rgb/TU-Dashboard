@@ -20,6 +20,7 @@ export async function POST(req: Request) {
         name: parsed.data.name,
         professor: parsed.data.professor || null,
         semester: parsed.data.semester || null,
+        ...(parsed.data.color !== undefined ? { color: parsed.data.color } : {}),
       },
       { onConflict: "course_code" },
     )

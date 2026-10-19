@@ -4,6 +4,7 @@ import Link from "next/link";
 import AddCourseButton from "@/components/courses/AddCourseButton";
 import SetupNotice from "@/components/SetupNotice";
 import { getOwnerId, getSupabaseAdmin } from "@/lib/supabase";
+import { assignCourseColors } from "@/lib/course-colors";
 import { fmtPct, letterFor, summarize } from "@/lib/grades";
 import type { Course, GradeComponent, GradeItem } from "@/lib/types";
 
@@ -46,6 +47,7 @@ export default async function CoursesPage() {
   for (const m of materials.data ?? []) get(m.course_code).materials++;
 
   const list = (courses.data ?? []) as Course[];
+  const colors = assignCourseColors(list);
   const allParts = (components.data ?? []) as GradeComponent[];
   const allItems = (gradeItems.data ?? []) as GradeItem[];
   const gradeFor = (code: string) => {
@@ -77,17 +79,20 @@ export default async function CoursesPage() {
               <Link
                 key={c.id}
                 href={`/courses/${c.course_code}`}
-                className="card group flex flex-col p-5 transition hover:-translate-y-0.5 hover:border-tu-200 hover:shadow-md"
+                className={`card course-bar course-${colors[c.course_code]} group flex flex-col overflow-hidden p-5 pl-6 transition hover:-translate-y-0.5 hover:shadow-lift`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-mono text-xs font-bold text-tu-600">{c.course_code}</p>
+                    <p className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-500">
+                      <span className="course-dot" />
+                      {c.course_code}
+                    </p>
                     <h2 className="mt-0.5 font-semibold leading-snug text-slate-900 group-hover:text-tu-700">{c.name}</h2>
                     <p className="mt-0.5 text-xs text-slate-500">
                       {[c.professor, c.semester && `Sem ${c.semester}`].filter(Boolean).join(" · ") || "—"}
                     </p>
                   </div>
-                  <BookOpen className="h-5 w-5 shrink-0 text-slate-300 group-hover:text-tu-400" />
+                  <BookOpen className="h-5 w-5 shrink-0 text-slate-300 group-hover:text-slate-500" />
                 </div>
 
                 <div className="mt-4">
@@ -112,7 +117,7 @@ export default async function CoursesPage() {
                   </p>
                 )}
 
-                <div className="mt-4 flex gap-4 text-xs text-slate-500">
+                <div data-calm="hide" className="mt-4 flex gap-4 text-xs text-slate-500">
                   <span className="flex items-center gap-1">
                     <FileText className="h-3.5 w-3.5" /> {s.materials} materials
                   </span>

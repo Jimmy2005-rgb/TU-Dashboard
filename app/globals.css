@@ -1,35 +1,71 @@
+@import "./theme.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light;
-}
+/* ─── Course colours ─────────────────────────────────────────────────────
+   Seven validated categorical hues (colour-blind safe; light & dark steps
+   chosen separately). Red is deliberately left out — it means "urgent". */
+.course-1 { --course: #2a78d6; }
+.course-2 { --course: #eb6834; }
+.course-3 { --course: #1baf7a; }
+.course-4 { --course: #eda100; }
+.course-5 { --course: #e87ba4; }
+.course-6 { --course: #008300; }
+.course-7 { --course: #6250d6; }
+.dark .course-1 { --course: #3987e5; }
+.dark .course-2 { --course: #d95926; }
+.dark .course-3 { --course: #199e70; }
+.dark .course-4 { --course: #c98500; }
+.dark .course-5 { --course: #d55181; }
+.dark .course-6 { --course: #008300; }
+.dark .course-7 { --course: #9085e9; }
 
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* Calm mode: hide non-essential detail and stop movement. */
+.calm [data-calm="hide"] {
+  display: none !important;
+}
+.calm *,
+.calm *::before,
+.calm *::after {
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 @layer components {
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+    @apply rounded-2xl border border-slate-200 bg-surface shadow-card;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition
-      focus:outline-none focus-visible:ring-2 focus-visible:ring-tu-500 focus-visible:ring-offset-2
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-tu-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50
       disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-tu-600 text-white hover:bg-tu-700;
+    @apply btn bg-tu-600 text-white shadow-sm hover:bg-tu-700 dark:hover:bg-tu-500;
   }
   .btn-secondary {
-    @apply btn border border-slate-200 bg-white text-slate-700 hover:bg-slate-50;
+    @apply btn border border-slate-200 bg-surface text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50;
   }
   .btn-ghost {
     @apply btn text-slate-600 hover:bg-slate-100 hover:text-slate-900;
   }
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400
+    @apply w-full rounded-xl border border-slate-300 bg-surface px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400
       focus:border-tu-500 focus:outline-none focus:ring-2 focus:ring-tu-500/20;
   }
   .label {
@@ -39,10 +75,34 @@ body {
     @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition;
   }
   .chip-on {
-    @apply chip border-tu-600 bg-tu-600 text-white;
+    @apply chip border-slate-900 bg-slate-900 text-slate-50;
   }
   .chip-off {
-    @apply chip border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50;
+    @apply chip border-slate-200 bg-surface text-slate-600 hover:border-slate-300 hover:bg-slate-50;
+  }
+  /* Course identity: coloured dot + code in normal text colour (never colour alone). */
+  .course-chip {
+    @apply inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-700;
+    background: color-mix(in srgb, var(--course, #64748b) 13%, rgb(var(--c-surface)));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--course, #64748b) 30%, transparent);
+  }
+  .course-dot {
+    @apply inline-block h-2 w-2 shrink-0 rounded-full;
+    background: var(--course, #94a3b8);
+  }
+  /* Thin course-colour stripe on the left edge (doesn't fight the card shadow). */
+  .course-bar {
+    position: relative;
+  }
+  .course-bar::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--course, transparent);
+  }
+  .section-title {
+    @apply flex items-center gap-2 text-[15px] font-semibold text-slate-900;
   }
 }
 

@@ -1,14 +1,18 @@
 "use client";
 
-import { Loader2, Plus } from "lucide-react";
+import clsx from "clsx";
+import { Check, Loader2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useCourseColors } from "@/components/CourseColors";
 import Modal from "@/components/ui/Modal";
 import { api } from "@/components/ui/api";
+import { COURSE_COLOR_COUNT, COURSE_COLOR_NAMES } from "@/lib/course-colors";
 import type { Course } from "@/lib/types";
 
 export default function AddCourseButton({ existing }: { existing?: Course }) {
   const router = useRouter();
+  const colors = useCourseColors();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     course_code: existing?.course_code ?? "",
@@ -16,17 +20,28 @@ export default function AddCourseButton({ existing }: { existing?: Course }) {
     professor: existing?.professor ?? "",
     semester: existing?.semester ?? "",
   });
+  // null = automatic. Show the colour the course currently has.
+  const [color, setColor] = useState<number | null>(existing?.color ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const shownColor = color ?? (existing ? colors[existing.course_code] : null);
+  const usedBy = (slot: number) =>
+    Object.entries(colors)
+      .filter(([code, c]) => c === slot && code !== existing?.course_code)
+      .map(([code]) => code);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      await api("/api/courses", { body: form });
+      await api("/api/courses", { body: { ...form, color } });
       setOpen(false);
-      if (!existing) setForm({ course_code: "", name: "", professor: "", semester: "" });
+      if (!existing) {
+        setForm({ course_code: "", name: "", professor: "", semester: "" });
+        setColor(null);
+      }
       router.refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -51,7 +66,9 @@ export default function AddCourseButton({ existing }: { existing?: Course }) {
   return (
     <>
       <button className={existing ? "btn-secondary" : "btn-primary"} onClick={() => setOpen(true)}>
-        {existing ? "Edit course" : (
+        {existing ? (
+          "Edit course"
+        ) : (
           <>
             <Plus className="h-4 w-4" /> Add course
           </>
@@ -65,6 +82,45 @@ export default function AddCourseButton({ existing }: { existing?: Course }) {
           </div>
           {field("name", "Course name", "Business Finance")}
           {field("professor", "Professor", "Asst. Prof. Dr. …")}
+
+          <div>
+            <span className="label">Colour</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {Array.from({ length: COURSE_COLOR_COUNT }, (_, i) => i + 1).map((slot) => {
+                const others = usedBy(slot);
+                const selected = shownColor === slot;
+                return (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setColor(slot)}
+                    className={clsx(
+                      `course-${slot} flex h-8 w-8 items-center justify-center rounded-full ring-offset-2 ring-offset-surface transition`,
+                      selected ? "ring-2 ring-slate-900" : "hover:scale-110",
+                    )}
+                    style={{ background: "var(--course)" }}
+                    aria-label={`${COURSE_COLOR_NAMES[slot - 1]}${others.length ? ` (also ${others.join(", ")})` : ""}`}
+                    title={`${COURSE_COLOR_NAMES[slot - 1]}${others.length ? ` — also used by ${others.join(", ")}` : ""}`}
+                  >
+                    {selected && <Check className="h-4 w-4 text-white" />}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setColor(null)}
+                className={clsx("chip", color === null ? "border-slate-900 text-slate-900" : "border-slate-200 text-slate-500")}
+              >
+                Auto
+              </button>
+            </div>
+            {shownColor && usedBy(shownColor).length > 0 && (
+              <p className="mt-1.5 text-xs text-slate-500">
+                {COURSE_COLOR_NAMES[shownColor - 1]} is also used by {usedBy(shownColor).join(", ")} — pick another if that&apos;s confusing.
+              </p>
+            )}
+          </div>
+
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)} disabled={loading}>

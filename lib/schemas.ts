@@ -142,6 +142,8 @@ export const CreateCourseRequest = z.object({
   name: z.string().trim().min(1).max(200),
   professor: z.string().trim().max(200).nullish(),
   semester: z.string().trim().max(50).nullish(),
+  /** 1–7, or null for automatic. Omit to leave unchanged. */
+  color: z.number().int().min(1).max(7).nullable().optional(),
 });
 
 export const CreateMaterialRequest = z.object({

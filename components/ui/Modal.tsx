@@ -34,9 +34,9 @@ export default function Modal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 animate-fade-in bg-slate-900/50" onClick={onClose} />
+      <div className="absolute inset-0 animate-fade-in bg-black/50" onClick={onClose} />
       <div
-        className={`relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl ${
+        className={`relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-xl sm:rounded-2xl ${
           wide ? "sm:max-w-3xl" : "sm:max-w-xl"
         }`}
       >

@@ -21,6 +21,7 @@ import { formatDate, formatDue } from "@/lib/dates";
 import { fmtPct, letterFor, summarize } from "@/lib/grades";
 import type { Assignment, Course, CourseMaterial, GradeComponent, GradeItem, PracticeSession, QuizQuestion } from "@/lib/types";
 import AssignmentModal from "@/components/AssignmentModal";
+import { useCourseColorClass } from "@/components/CourseColors";
 import AddAssignmentModal from "@/components/dashboard/AddAssignmentModal";
 import QuickAddModal from "@/components/dashboard/QuickAddModal";
 import AddCourseButton from "./AddCourseButton";
@@ -50,6 +51,7 @@ export default function CourseDetailClient({
   aiEnabled: boolean;
 }) {
   const router = useRouter();
+  const courseColor = useCourseColorClass(course.course_code);
   const [tutorOpen, setTutorOpen] = useState(false);
   const [list, setList] = useState(assignments);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -81,7 +83,10 @@ export default function CourseDetailClient({
       {/* Header */}
       <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="font-mono text-sm font-bold text-tu-600">{course.course_code}</p>
+          <p className={`${courseColor} flex items-center gap-2 font-mono text-sm font-bold text-slate-500`}>
+            <span className="course-dot h-2.5 w-2.5" />
+            {course.course_code}
+          </p>
           <h1 className="text-2xl font-bold tracking-tight">{course.name}</h1>
           <p className="text-sm text-slate-500">
             {[course.professor, course.semester && `Semester ${course.semester}`].filter(Boolean).join(" · ") || "Add professor & semester via Edit course"}
@@ -105,7 +110,7 @@ export default function CourseDetailClient({
       </div>
 
       {/* Stat strip */}
-      <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div data-calm="hide" className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Course progress" value={`${pct}%`} sub={`${done}/${assignments.length} assignments`}>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
             <div className="h-full rounded-full bg-tu-600" style={{ width: `${pct}%` }} />

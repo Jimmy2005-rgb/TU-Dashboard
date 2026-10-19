@@ -17,6 +17,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useCourseColors } from "@/components/CourseColors";
 import { CourseBadge, Tag } from "@/components/ui/badges";
 import { api } from "@/components/ui/api";
 import { formatDate } from "@/lib/dates";
@@ -53,6 +54,7 @@ export default function PracticeClient({
   aiEnabled: boolean;
 }) {
   const [questions, setQuestions] = useState(initialQuestions);
+  const colors = useCourseColors();
   const [sessions, setSessions] = useState(initialSessions);
 
   const counts = useMemo(() => {
@@ -239,8 +241,9 @@ export default function PracticeClient({
               setCourse(c);
               setTag("all");
             }}
-            className={clsx(course === c ? "chip-on" : "chip-off", "font-mono")}
+            className={clsx(course === c ? "chip-on" : "chip-off", "font-mono", colors[c] && `course-${colors[c]}`)}
           >
+            <span className="course-dot" />
             {c}
             <span className={clsx("rounded-full px-1.5 text-[10px]", course === c ? "bg-white/20" : "bg-slate-100")}>
               {counts.get(c) ?? 0}
