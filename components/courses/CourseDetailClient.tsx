@@ -8,21 +8,15 @@ import {
   CheckCircle2,
   ChevronDown,
   Circle,
-  ExternalLink,
-  FileText,
   History,
-  Link2,
-  Loader2,
   Play,
   Plus,
   Sparkles,
-  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { PlatformBadge, Tag } from "@/components/ui/badges";
-import { api } from "@/components/ui/api";
 import { formatDate, formatDue } from "@/lib/dates";
 import { fmtPct, letterFor, summarize } from "@/lib/grades";
 import type { Assignment, Course, CourseMaterial, GradeComponent, GradeItem, PracticeSession, QuizQuestion } from "@/lib/types";
@@ -30,6 +24,7 @@ import AssignmentModal from "@/components/AssignmentModal";
 import AddAssignmentModal from "@/components/dashboard/AddAssignmentModal";
 import QuickAddModal from "@/components/dashboard/QuickAddModal";
 import AddCourseButton from "./AddCourseButton";
+import MaterialsPanel from "./MaterialsPanel";
 import GradesPanel from "./GradesPanel";
 import TutorPanel from "./TutorPanel";
 
@@ -61,10 +56,6 @@ export default function CourseDetailClient({
   const [addOpen, setAddOpen] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   useEffect(() => setList(assignments), [assignments]);
-  const [materials, setMaterials] = useState(initialMaterials);
-  const [form, setForm] = useState({ title: "", url: "", notes: "" });
-  const [adding, setAdding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const done = assignments.filter((a) => a.status === "completed").length;
@@ -80,34 +71,6 @@ export default function CourseDetailClient({
     ? Math.round((sessions.reduce((s, x) => s + x.score / x.total_questions, 0) / sessions.length) * 100)
     : null;
 
-  async function addMaterial(e: React.FormEvent) {
-    e.preventDefault();
-    setAdding(true);
-    setError(null);
-    try {
-      const { material } = await api<{ material: CourseMaterial }>(`/api/courses/${course.course_code}/materials`, {
-        body: { title: form.title, url: form.url || null, notes: form.notes || null },
-      });
-      setMaterials((prev) => [material, ...prev]);
-      setForm({ title: "", url: "", notes: "" });
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setAdding(false);
-    }
-  }
-
-  async function removeMaterial(m: CourseMaterial) {
-    if (!confirm(`Remove "${m.title}"?`)) return;
-    const before = materials;
-    setMaterials((prev) => prev.filter((x) => x.id !== m.id));
-    try {
-      await api(`/api/materials/${m.id}`, { method: "DELETE" });
-    } catch (err) {
-      setMaterials(before);
-      setError((err as Error).message);
-    }
-  }
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -157,13 +120,12 @@ export default function CourseDetailClient({
         <Stat label="Practice avg" value={avgScore == null ? "—" : `${avgScore}%`} sub={`last ${sessions.length} sessions`} />
       </div>
 
-      {error && <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       <div className="mt-5">
         <GradesPanel course={course} initialComponents={gradeComponents} initialItems={gradeItems} aiEnabled={aiEnabled} />
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid gap-4">
         {/* Assignments */}
         <section className="card p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -213,69 +175,8 @@ export default function CourseDetailClient({
           )}
         </section>
 
-        {/* Materials */}
-        <section className="card p-5">
-          <h2 className="flex items-center gap-2 font-semibold">
-            <FileText className="h-5 w-5 text-tu-600" /> Materials
-          </h2>
-          <form onSubmit={addMaterial} className="mt-3 space-y-2">
-            <div className="flex gap-2">
-              <input
-                className="input"
-                placeholder="Title (e.g. Week 3 slides — Bond valuation)"
-                value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              />
-              <button type="submit" className="btn-primary shrink-0 px-3" disabled={adding || !form.title.trim()} aria-label="Add material">
-                {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              </button>
-            </div>
-            {form.title && (
-              <>
-                <input
-                  className="input"
-                  placeholder="Link (Google Drive, OneDrive, Teams file…) — optional"
-                  value={form.url}
-                  onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-                />
-                <textarea
-                  className="input min-h-[60px]"
-                  placeholder="Notes — optional"
-                  value={form.notes}
-                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                />
-              </>
-            )}
-          </form>
-          {materials.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-500">Save slide decks, readings and notes for quick access.</p>
-          ) : (
-            <ul className="mt-3 divide-y divide-slate-100">
-              {materials.map((m) => (
-                <li key={m.id} className="group flex items-start gap-2 py-2 text-sm">
-                  <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                  <div className="min-w-0 flex-1">
-                    {m.url ? (
-                      <a href={m.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-slate-800 hover:text-tu-700">
-                        {m.title} <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : (
-                      <p className="font-medium text-slate-800">{m.title}</p>
-                    )}
-                    {m.notes && <p className="mt-0.5 whitespace-pre-wrap text-xs text-slate-500">{m.notes}</p>}
-                  </div>
-                  <button
-                    onClick={() => removeMaterial(m)}
-                    className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100"
-                    aria-label="Remove material"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        {/* Materials & exercises (uploaded files, links and notes) */}
+        <MaterialsPanel courseCode={course.course_code} initialMaterials={initialMaterials} aiEnabled={aiEnabled} />
       </div>
 
       {/* Score history */}

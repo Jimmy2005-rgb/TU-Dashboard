@@ -51,6 +51,8 @@ export interface PracticeSession {
   created_at: string;
 }
 
+export type MaterialKind = "material" | "exercise";
+
 export interface CourseMaterial {
   id: string;
   user_id: string;
@@ -58,6 +60,12 @@ export interface CourseMaterial {
   title: string;
   url: string | null;
   notes: string | null;
+  kind: MaterialKind;
+  /** Set when the material is an uploaded file (path inside the course-files bucket). */
+  file_path: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  mime_type: string | null;
   created_at: string;
 }
 

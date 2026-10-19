@@ -148,6 +148,23 @@ export const CreateMaterialRequest = z.object({
   title: z.string().trim().min(1).max(200),
   url: z.string().trim().url().max(2000).nullish().or(z.literal("")),
   notes: z.string().trim().max(5000).nullish(),
+  kind: z.enum(["material", "exercise"]).default("material"),
+  /** Set after the browser has uploaded the file with a signed upload URL. */
+  file_path: z.string().max(500).nullish(),
+  file_name: z.string().max(300).nullish(),
+  file_size: z.number().int().min(0).nullish(),
+  mime_type: z.string().max(200).nullish(),
+});
+
+export const UploadUrlRequest = z.object({
+  file_name: z.string().trim().min(1).max(300),
+  file_size: z.number().int().min(1, "That file is empty.").max(50 * 1024 * 1024, "Files can be up to 50 MB."),
+});
+
+export const UpdateMaterialRequest = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  kind: z.enum(["material", "exercise"]).optional(),
+  notes: z.string().trim().max(5000).nullable().optional(),
 });
 
 /** Payload accepted from Make.com / n8n. Accepts one item or a batch. */
