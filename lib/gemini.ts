@@ -9,6 +9,39 @@ import { AiError, type ChatOptions, type ExtractOptions } from "./ai-shared";
  */
 export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 
+/**
+ * Free-tier backups tried in order when the main model is busy (503 "high
+ * demand") or rate-limited. Override with GEMINI_FALLBACK_MODELS="a,b".
+ */
+const GEMINI_MODELS = Array.from(
+  new Set(
+    [GEMINI_MODEL, ...(process.env.GEMINI_FALLBACK_MODELS ?? "gemini-3.5-flash-lite,gemini-2.5-flash").split(",")]
+      .map((m) => m.trim())
+      .filter(Boolean),
+  ),
+);
+
+/** Errors worth retrying on another model: busy, rate-limited, or a transient server fault. */
+function isTransient(err: unknown): boolean {
+  return err instanceof ApiError && [429, 500, 502, 503, 504].includes(err.status);
+}
+
+/** Runs `call` on each model in turn until one succeeds or a non-transient error occurs. */
+async function withModelFallback<T>(call: (model: string) => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (const [i, model] of GEMINI_MODELS.entries()) {
+    try {
+      return await call(model);
+    } catch (err) {
+      if (!isTransient(err)) throw err;
+      lastError = err;
+      console.warn(`[gemini] ${model} unavailable (${(err as ApiError).status}); trying next model`);
+      if (i < GEMINI_MODELS.length - 1) await new Promise((r) => setTimeout(r, 600));
+    }
+  }
+  throw lastError;
+}
+
 let client: GoogleGenAI | null = null;
 
 function getGemini(): GoogleGenAI {
@@ -34,16 +67,20 @@ function toContents(messages: ChatOptions["messages"]): Content[] {
 /** Structured extraction: Gemini returns JSON constrained to `schema`, validated again with Zod. */
 export async function geminiExtract<S extends z.ZodType>(opts: ExtractOptions<S>): Promise<z.infer<S>> {
   const fileParts = (opts.files ?? []).map((f) => ({ inlineData: { mimeType: f.mimeType, data: f.data } }));
-  const response = await getGemini().models.generateContent({
-    model: GEMINI_MODEL,
-    contents: fileParts.length ? [{ role: "user", parts: [...fileParts, { text: opts.input }] }] : opts.input,
-    config: {
-      systemInstruction: opts.system,
-      responseMimeType: "application/json",
-      responseJsonSchema: toGeminiSchema(opts.schema),
-      maxOutputTokens: opts.maxTokens ?? 32000,
-    },
-  });
+  const contents = fileParts.length ? [{ role: "user", parts: [...fileParts, { text: opts.input }] }] : opts.input;
+  const responseJsonSchema = toGeminiSchema(opts.schema);
+  const response = await withModelFallback((model) =>
+    getGemini().models.generateContent({
+      model,
+      contents,
+      config: {
+        systemInstruction: opts.system,
+        responseMimeType: "application/json",
+        responseJsonSchema,
+        maxOutputTokens: opts.maxTokens ?? 32000,
+      },
+    }),
+  );
 
   const finish = response.candidates?.[0]?.finishReason;
   if (finish === FinishReason.SAFETY || finish === FinishReason.RECITATION || response.promptFeedback?.blockReason) {
@@ -68,11 +105,11 @@ export async function geminiExtract<S extends z.ZodType>(opts: ExtractOptions<S>
 
 /** Yields a tutor reply as it is generated. */
 export async function* geminiStreamText(opts: ChatOptions): AsyncGenerator<string> {
-  const stream = await getGemini().models.generateContentStream({
-    model: GEMINI_MODEL,
-    contents: toContents(opts.messages),
-    config: { systemInstruction: opts.system },
-  });
+  // Fallback applies to starting the reply; a failure mid-stream is reported as-is.
+  const contents = toContents(opts.messages);
+  const stream = await withModelFallback((model) =>
+    getGemini().models.generateContentStream({ model, contents, config: { systemInstruction: opts.system } }),
+  );
 
   let finish: FinishReason | undefined;
   for await (const chunk of stream) {
@@ -93,6 +130,9 @@ export function describeGeminiError(err: unknown): { message: string; status: nu
   if (!(err instanceof ApiError)) return null;
   if (err.status === 429) {
     return { message: "Free Gemini limit reached — wait a minute and try again.", status: 429 };
+  }
+  if ([500, 502, 503, 504].includes(err.status)) {
+    return { message: "Google's free Gemini models are busy right now. Wait a minute and try again.", status: 503 };
   }
   if (err.status === 400 && /api key/i.test(err.message)) {
     return { message: "Google rejected the Gemini key (API key not valid). Re-copy it from AI Studio into GEMINI_API_KEY in Vercel, then redeploy.", status: 502 };
