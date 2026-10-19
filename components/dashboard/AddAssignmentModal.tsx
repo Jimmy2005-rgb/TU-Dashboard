@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Modal from "@/components/ui/Modal";
 import { api } from "@/components/ui/api";
 import type { Assignment, SourcePlatform } from "@/lib/types";
@@ -22,15 +22,21 @@ export default function AddAssignmentModal({
   onClose,
   courses,
   onCreated,
+  defaultCourse = "",
 }: {
   open: boolean;
   onClose: () => void;
   courses: string[];
   onCreated: (assignment: Assignment) => void;
+  defaultCourse?: string;
 }) {
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState({ ...EMPTY, course_code: defaultCourse });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) setForm((f) => ({ ...f, course_code: f.course_code || defaultCourse }));
+  }, [open, defaultCourse]);
 
   const set = <K extends keyof typeof EMPTY>(key: K, value: (typeof EMPTY)[K]) => setForm((f) => ({ ...f, [key]: value }));
 

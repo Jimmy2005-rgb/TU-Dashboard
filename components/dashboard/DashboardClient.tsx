@@ -19,6 +19,7 @@ import { CourseBadge, PlatformBadge } from "@/components/ui/badges";
 import { api } from "@/components/ui/api";
 import { BUCKET_LABELS, formatDue, formatLongDate, relativeDue, urgencyBucket, type UrgencyBucket } from "@/lib/dates";
 import { PLATFORM_LABELS, type Assignment, type Course, type SourcePlatform } from "@/lib/types";
+import AssignmentModal from "@/components/AssignmentModal";
 import AddAssignmentModal from "./AddAssignmentModal";
 import QuickAddModal from "./QuickAddModal";
 
@@ -52,6 +53,7 @@ export default function DashboardClient({
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => setAssignments(initialAssignments), [initialAssignments]);
   useEffect(() => {
@@ -223,7 +225,7 @@ export default function DashboardClient({
               </h2>
               <ul className="card divide-y divide-slate-100">
                 {grouped[bucket].map((a) => (
-                  <AssignmentRow key={a.id} a={a} now={now} onToggle={toggle} onDelete={remove} />
+                  <AssignmentRow key={a.id} a={a} now={now} onToggle={toggle} onDelete={remove} onOpen={() => setOpenId(a.id)} />
                 ))}
               </ul>
             </section>
@@ -243,13 +245,21 @@ export default function DashboardClient({
             {showCompleted && (
               <ul className="card divide-y divide-slate-100">
                 {completed.map((a) => (
-                  <AssignmentRow key={a.id} a={a} now={now} onToggle={toggle} onDelete={remove} />
+                  <AssignmentRow key={a.id} a={a} now={now} onToggle={toggle} onDelete={remove} onOpen={() => setOpenId(a.id)} />
                 ))}
               </ul>
             )}
           </section>
         )}
       </div>
+
+      <AssignmentModal
+        assignment={assignments.find((x) => x.id === openId) ?? null}
+        courses={courseCodes}
+        onClose={() => setOpenId(null)}
+        onChanged={(updated) => setAssignments((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
+        onDeleted={(id) => setAssignments((prev) => prev.filter((x) => x.id !== id))}
+      />
 
       <AddAssignmentModal
         open={addOpen}
@@ -273,11 +283,13 @@ function AssignmentRow({
   now,
   onToggle,
   onDelete,
+  onOpen,
 }: {
   a: Assignment;
   now: number;
   onToggle: (a: Assignment) => void;
   onDelete: (a: Assignment) => void;
+  onOpen: () => void;
 }) {
   const done = a.status === "completed";
   const bucket = urgencyBucket(a.due_date, now);
@@ -290,16 +302,17 @@ function AssignmentRow({
       >
         {done ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
       </button>
-      <div className="min-w-0 flex-1">
+      <button onClick={onOpen} className="min-w-0 flex-1 text-left" title="Show full details">
         <div className="flex flex-wrap items-center gap-1.5">
           <CourseBadge code={a.course_code} />
           <PlatformBadge platform={a.source_platform} />
-          <p className={clsx("min-w-0 truncate text-sm font-medium", done ? "text-slate-400 line-through" : "text-slate-900")}>
-            {a.title}
-          </p>
         </div>
-        {a.description && <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{a.description}</p>}
-      </div>
+        <p className={clsx("mt-1 text-sm font-medium leading-snug group-hover:text-tu-700", done ? "text-slate-400 line-through" : "text-slate-900")}>
+          {a.title}
+        </p>
+        {a.description && <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-slate-500">{a.description}</p>}
+        <span className="mt-1 inline-block text-[11px] font-medium text-tu-600 opacity-80 group-hover:opacity-100">View details →</span>
+      </button>
       <div className="flex shrink-0 items-center gap-1">
         <div className="text-right">
           <p className={clsx("text-xs font-medium", done ? "text-slate-400" : BUCKET_ACCENT[bucket])}>{formatDue(a.due_date)}</p>

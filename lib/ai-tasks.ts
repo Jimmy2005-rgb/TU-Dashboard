@@ -21,7 +21,7 @@ Input is raw text and/or attached files (PDFs, photos or screenshots): a syllabu
 
 Rules:
 - One entry per distinct deliverable. Do not invent tasks that are not in the text.
-- course_code: Thammasat style (2-4 letters + 3 digits, no space, e.g. FN201, AC201, MK201). Use the code in the text; if none is given use the default course code supplied, otherwise null.
+- course_code: Thammasat style (2-4 letters + 3 digits, no space, e.g. FN201, AC201, MK201). Use the code in the text. If the text has no code but clearly names one of the student's courses (by course title, e.g. "Digital Technology"), use that course's code from the list supplied. Otherwise use the default course code supplied, else null. Don't guess from the topic alone.
 - due_date: resolve relative dates ("next Friday", "Week 5") against the current date supplied. If only a date is given, use 23:59 that day. Always output ISO 8601 with the +07:00 offset. If the text gives no usable deadline, return null — never guess.
 - Thai dates and Buddhist-era years (e.g. 2569) must be converted to the Gregorian calendar (subtract 543).
 - Keep descriptions concise: deliverables, format, weighting, submission channel.
@@ -31,10 +31,14 @@ export async function parseAssignmentsWithAI(
   text: string,
   defaultCourseCode?: string | null,
   files: AiFile[] = [],
+  knownCourses: Pick<Course, "course_code" | "name">[] = [],
 ): Promise<ParsedAssignments> {
   const input = [
     `Current date: ${bangkokNow()}`,
     `Default course code: ${defaultCourseCode || "none"}`,
+    knownCourses.length
+      ? `Student's courses: ${knownCourses.map((c) => (c.name && c.name !== c.course_code ? `${c.course_code} = ${c.name}` : c.course_code)).join("; ")}`
+      : "",
     files.length ? `Attached files: ${files.map((f) => f.name).join(", ")}` : "",
     "",
     "<text>",

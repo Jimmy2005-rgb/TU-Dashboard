@@ -102,9 +102,19 @@ export const CreateQuestionRequest = z
     path: ["correct_answer"],
   });
 
-export const UpdateAssignmentRequest = z.object({
-  status: z.enum(["pending", "completed"]),
-});
+/** Any subset of fields; null clears an optional field (e.g. due_date: null = no deadline). */
+export const UpdateAssignmentRequest = z
+  .object({
+    status: z.enum(["pending", "completed"]),
+    title: z.string().trim().min(1, "Title can't be empty.").max(500),
+    course_code: z.string().trim().max(20).nullable(),
+    source_platform: platform,
+    due_date: z.string().trim().max(100).nullable(),
+    description: z.string().trim().max(20_000).nullable(),
+    external_link: z.string().trim().url("Link must be a full URL (https://…).").max(2000).nullable().or(z.literal("")),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, { message: "Nothing to update." });
 
 export const PracticeSessionRequest = z.object({
   course_code: z.string().trim().max(10).nullish(),

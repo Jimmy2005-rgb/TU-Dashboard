@@ -24,7 +24,7 @@ export default async function CoursePage({ params }: { params: { code: string } 
   }
   const userId = getOwnerId();
 
-  const [course, assignments, materials, questions, sessions, components] = await Promise.all([
+  const [course, assignments, materials, questions, sessions, components, allCourses] = await Promise.all([
     db.from("courses").select("*").eq("course_code", code).maybeSingle<Course>(),
     db
       .from("assignments")
@@ -52,6 +52,7 @@ export default async function CoursePage({ params }: { params: { code: string } 
       .eq("user_id", userId)
       .eq("course_code", code)
       .order("sort_order", { ascending: true }),
+    db.from("courses").select("course_code").order("course_code"),
   ]);
 
   const componentIds = (components.data ?? []).map((c) => c.id as string);
@@ -73,6 +74,7 @@ export default async function CoursePage({ params }: { params: { code: string } 
       sessions={(sessions.data ?? []) as PracticeSession[]}
       gradeComponents={(components.data ?? []) as GradeComponent[]}
       gradeItems={(gradeItems.data ?? []) as GradeItem[]}
+      allCourses={(allCourses.data ?? []).map((c) => c.course_code as string)}
       aiEnabled={aiProvider() !== null}
     />
   );

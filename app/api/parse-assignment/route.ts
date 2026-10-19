@@ -4,7 +4,7 @@ import { aiErrorStatus, describeAiError } from "@/lib/ai";
 import { jsonError } from "@/lib/http";
 import { ParseAssignmentRequest } from "@/lib/schemas";
 import { ensureCourses, getOwnerId, getSupabaseAdmin } from "@/lib/supabase";
-import type { Assignment } from "@/lib/types";
+import type { Assignment, Course } from "@/lib/types";
 import { readAiRequest } from "@/lib/uploads";
 
 export const runtime = "nodejs";
@@ -23,9 +23,12 @@ export async function POST(req: Request) {
   const { text, source_platform, default_course_code } = parsed.data;
   if (text.length < 5 && parsed.files.length === 0) return jsonError("Paste some text or drop a file first.");
 
+  // Give the AI the student's course list so it can match announcements by course name.
+  const { data: knownCourses } = await getSupabaseAdmin().from("courses").select("course_code, name").order("course_code");
+
   let result;
   try {
-    result = await parseAssignmentsWithAI(text, default_course_code, parsed.files);
+    result = await parseAssignmentsWithAI(text, default_course_code, parsed.files, (knownCourses ?? []) as Course[]);
   } catch (err) {
     console.error("[parse-assignment] AI error", err);
     return jsonError(describeAiError(err), aiErrorStatus(err));

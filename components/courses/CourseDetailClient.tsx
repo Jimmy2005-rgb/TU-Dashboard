@@ -15,15 +15,20 @@ import {
   Loader2,
   Play,
   Plus,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { PlatformBadge, Tag } from "@/components/ui/badges";
 import { api } from "@/components/ui/api";
 import { formatDate, formatDue } from "@/lib/dates";
 import { fmtPct, letterFor, summarize } from "@/lib/grades";
 import type { Assignment, Course, CourseMaterial, GradeComponent, GradeItem, PracticeSession, QuizQuestion } from "@/lib/types";
+import AssignmentModal from "@/components/AssignmentModal";
+import AddAssignmentModal from "@/components/dashboard/AddAssignmentModal";
+import QuickAddModal from "@/components/dashboard/QuickAddModal";
 import AddCourseButton from "./AddCourseButton";
 import GradesPanel from "./GradesPanel";
 import TutorPanel from "./TutorPanel";
@@ -36,6 +41,7 @@ export default function CourseDetailClient({
   sessions,
   gradeComponents,
   gradeItems,
+  allCourses,
   aiEnabled,
 }: {
   course: Course;
@@ -45,9 +51,16 @@ export default function CourseDetailClient({
   sessions: PracticeSession[];
   gradeComponents: GradeComponent[];
   gradeItems: GradeItem[];
+  allCourses: string[];
   aiEnabled: boolean;
 }) {
+  const router = useRouter();
   const [tutorOpen, setTutorOpen] = useState(false);
+  const [list, setList] = useState(assignments);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  useEffect(() => setList(assignments), [assignments]);
   const [materials, setMaterials] = useState(initialMaterials);
   const [form, setForm] = useState({ title: "", url: "", notes: "" });
   const [adding, setAdding] = useState(false);
@@ -153,23 +166,47 @@ export default function CourseDetailClient({
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         {/* Assignments */}
         <section className="card p-5">
-          <h2 className="flex items-center gap-2 font-semibold">
-            <CheckCircle2 className="h-5 w-5 text-tu-600" /> Assignments
-          </h2>
-          {assignments.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-500">Nothing yet. Add deadlines from the dashboard.</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-semibold">
+              <CheckCircle2 className="h-5 w-5 text-tu-600" /> Assignments
+            </h2>
+            <div className="flex gap-1.5">
+              {aiEnabled && (
+                <button className="btn-secondary px-2.5 py-1.5 text-xs" onClick={() => setPasteOpen(true)}>
+                  <Sparkles className="h-3.5 w-3.5 text-gold-600" /> Paste (AI)
+                </button>
+              )}
+              <button className="btn-primary px-2.5 py-1.5 text-xs" onClick={() => setAddOpen(true)}>
+                <Plus className="h-3.5 w-3.5" /> Add
+              </button>
+            </div>
+          </div>
+          {list.length === 0 ? (
+            <p className="mt-3 text-sm text-slate-500">
+              Nothing for {course.course_code} yet. Use <strong>Add</strong>{aiEnabled ? " or Paste (AI)" : ""} — they&apos;re saved to this course
+              automatically.
+            </p>
           ) : (
             <ul className="mt-3 divide-y divide-slate-100">
-              {[...upcoming, ...assignments.filter((a) => a.status === "completed")].slice(0, 12).map((a) => (
-                <li key={a.id} className="flex items-center gap-2.5 py-2 text-sm">
-                  {a.status === "completed" ? (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-                  ) : (
-                    <Circle className="h-4 w-4 shrink-0 text-slate-300" />
-                  )}
-                  <span className={clsx("min-w-0 flex-1 truncate", a.status === "completed" && "text-slate-400 line-through")}>{a.title}</span>
-                  <PlatformBadge platform={a.source_platform} />
-                  <span className="shrink-0 text-xs text-slate-500">{formatDue(a.due_date)}</span>
+              {[...list.filter((a) => a.status === "pending"), ...list.filter((a) => a.status === "completed")].map((a) => (
+                <li key={a.id}>
+                  <button onClick={() => setOpenId(a.id)} className="group flex w-full items-start gap-2.5 py-2.5 text-left text-sm">
+                    {a.status === "completed" ? (
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                    ) : (
+                      <Circle className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" />
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className={clsx("block font-medium group-hover:text-tu-700", a.status === "completed" && "text-slate-400 line-through")}>
+                        {a.title}
+                      </span>
+                      {a.description && <span className="mt-0.5 line-clamp-2 block text-xs text-slate-500">{a.description}</span>}
+                    </span>
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-xs text-slate-500">{formatDue(a.due_date)}</span>
+                      <PlatformBadge platform={a.source_platform} />
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -343,6 +380,42 @@ export default function CourseDetailClient({
           </ul>
         )}
       </section>
+
+      <AssignmentModal
+        assignment={list.find((a) => a.id === openId) ?? null}
+        courses={allCourses}
+        onClose={() => setOpenId(null)}
+        onChanged={(updated) => {
+          // Moved to another course → it leaves this list.
+          setList((prev) => prev.flatMap((a) => (a.id !== updated.id ? [a] : updated.course_code === course.course_code ? [updated] : [])));
+          if (updated.course_code !== course.course_code) setOpenId(null);
+          router.refresh();
+        }}
+        onDeleted={(id) => {
+          setList((prev) => prev.filter((a) => a.id !== id));
+          router.refresh();
+        }}
+      />
+      <AddAssignmentModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        courses={allCourses}
+        defaultCourse={course.course_code}
+        onCreated={(created) => {
+          if (created.course_code === course.course_code) setList((prev) => [created, ...prev]);
+          router.refresh();
+        }}
+      />
+      <QuickAddModal
+        open={pasteOpen}
+        onClose={() => setPasteOpen(false)}
+        courses={allCourses}
+        defaultCourse={course.course_code}
+        onCreated={(created) => {
+          setList((prev) => [...created.filter((a) => a.course_code === course.course_code), ...prev]);
+          router.refresh();
+        }}
+      />
 
       <TutorPanel course={course} open={tutorOpen} onClose={() => setTutorOpen(false)} />
     </div>

@@ -21,16 +21,18 @@ export default function QuickAddModal({
   onClose,
   courses,
   onCreated,
+  defaultCourse: presetCourse = "",
 }: {
   open: boolean;
   onClose: () => void;
   courses: string[];
   onCreated: (assignments: Assignment[]) => void;
+  defaultCourse?: string;
 }) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [platform, setPlatform] = useState<SourcePlatform>("manual");
-  const [defaultCourse, setDefaultCourse] = useState("");
+  const [defaultCourse, setDefaultCourse] = useState(presetCourse);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Assignment[] | null>(null);

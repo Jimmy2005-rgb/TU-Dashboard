@@ -64,6 +64,15 @@ export function formatLongDate(d: Date | number): string {
   return `${DAYS[b.weekday]}, ${b.day} ${MONTHS[b.month]} ${b.year}`;
 }
 
+/** Values for <input type="date"> and <input type="time"> in Bangkok time. */
+export function toBangkokInputs(iso: string | null): { date: string; time: string } {
+  if (!iso) return { date: "", time: "23:59" };
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: "", time: "23:59" };
+  const b = bangkok(d);
+  return { date: `${b.year}-${String(b.month + 1).padStart(2, "0")}-${String(b.day).padStart(2, "0")}`, time: b.time };
+}
+
 /** "in 5h", "in 3d", "2d ago" */
 export function relativeDue(dueDate: string | null, now = Date.now()): string {
   if (!dueDate) return "";
