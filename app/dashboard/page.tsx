@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import DashboardClient from "@/components/dashboard/DashboardClient";
 import SetupNotice from "@/components/SetupNotice";
+import { aiProvider } from "@/lib/ai";
 import { getOwnerId, getSupabaseAdmin } from "@/lib/supabase";
 import type { Assignment, Course } from "@/lib/types";
 
@@ -45,6 +46,7 @@ export default async function DashboardPage() {
       initialAssignments={[...(pending.data ?? []), ...(completed.data ?? [])] as Assignment[]}
       courses={(courses.data ?? []) as Course[]}
       serverNow={Date.now()}
+      aiEnabled={aiProvider() !== null}
     />
   );
 }

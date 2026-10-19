@@ -72,6 +72,36 @@ export const GenerateVariationRequest = z.object({
   save: z.boolean().default(true),
 });
 
+export const CreateAssignmentRequest = z.object({
+  title: z.string().trim().min(1, "Give the assignment a title.").max(500),
+  course_code: z.string().trim().max(20).nullish(),
+  source_platform: platform.default("manual"),
+  /** ISO string, or "YYYY-MM-DDTHH:mm" from a date picker (read as Bangkok time). */
+  due_date: z.string().trim().max(100).nullish(),
+  description: z.string().trim().max(20_000).nullish(),
+  external_link: z.string().trim().url("Link must be a full URL (https://…).").max(2000).nullish().or(z.literal("")),
+});
+
+export const CreateQuestionRequest = z
+  .object({
+    course_code: z.string().trim().min(5).max(10),
+    question_type: z.enum(["mcq", "open_ended"]),
+    question_text: z.string().trim().min(1, "Write the question.").max(20_000),
+    options: z.array(z.string().trim().max(2000)).max(10).default([]),
+    correct_answer: z.string().trim().min(1, "Give the correct answer.").max(20_000),
+    explanation: z.string().trim().max(20_000).nullish(),
+    tags: z.array(z.string().trim().toLowerCase().max(50)).max(10).default([]),
+  })
+  .transform((q) => ({ ...q, options: q.question_type === "mcq" ? q.options.filter(Boolean) : [] }))
+  .refine((q) => q.question_type === "open_ended" || q.options.length >= 2, {
+    message: "Multiple choice needs at least 2 choices.",
+    path: ["options"],
+  })
+  .refine((q) => q.question_type === "open_ended" || q.options.includes(q.correct_answer), {
+    message: "Pick which choice is correct.",
+    path: ["correct_answer"],
+  });
+
 export const UpdateAssignmentRequest = z.object({
   status: z.enum(["pending", "completed"]),
 });

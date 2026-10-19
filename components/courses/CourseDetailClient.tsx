@@ -31,12 +31,14 @@ export default function CourseDetailClient({
   initialMaterials,
   questions,
   sessions,
+  aiEnabled,
 }: {
   course: Course;
   assignments: Assignment[];
   initialMaterials: CourseMaterial[];
   questions: QuizQuestion[];
   sessions: PracticeSession[];
+  aiEnabled: boolean;
 }) {
   const [tutorOpen, setTutorOpen] = useState(false);
   const [materials, setMaterials] = useState(initialMaterials);
@@ -101,8 +103,14 @@ export default function CourseDetailClient({
           <Link href={`/practice?course=${course.course_code}`} className="btn-secondary">
             <Play className="h-4 w-4" /> Practice
           </Link>
-          <button className="btn-primary" onClick={() => setTutorOpen(true)}>
+          <button
+            className="btn-primary"
+            onClick={() => setTutorOpen(true)}
+            disabled={!aiEnabled}
+            title={aiEnabled ? undefined : "AI is off: add a free GEMINI_API_KEY in Vercel to turn it on"}
+          >
             <Bot className="h-4 w-4" /> Ask Tutor
+            {!aiEnabled && <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase">off</span>}
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import CourseDetailClient from "@/components/courses/CourseDetailClient";
 import SetupNotice from "@/components/SetupNotice";
+import { aiProvider } from "@/lib/ai";
 import { getOwnerId, getSupabaseAdmin, normalizeCourseCode } from "@/lib/supabase";
 import type { Assignment, Course, CourseMaterial, PracticeSession, QuizQuestion } from "@/lib/types";
 
@@ -58,6 +59,7 @@ export default async function CoursePage({ params }: { params: { code: string } 
       initialMaterials={(materials.data ?? []) as CourseMaterial[]}
       questions={(questions.data ?? []) as QuizQuestion[]}
       sessions={(sessions.data ?? []) as PracticeSession[]}
+      aiEnabled={aiProvider() !== null}
     />
   );
 }

@@ -10,6 +10,7 @@ import {
   Circle,
   ExternalLink,
   Inbox,
+  Plus,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -18,6 +19,7 @@ import { CourseBadge, PlatformBadge } from "@/components/ui/badges";
 import { api } from "@/components/ui/api";
 import { BUCKET_LABELS, formatDue, relativeDue, urgencyBucket, type UrgencyBucket } from "@/lib/dates";
 import { PLATFORM_LABELS, type Assignment, type Course, type SourcePlatform } from "@/lib/types";
+import AddAssignmentModal from "./AddAssignmentModal";
 import QuickAddModal from "./QuickAddModal";
 
 const BUCKET_ORDER: UrgencyBucket[] = ["overdue", "within48h", "thisWeek", "later", "noDate"];
@@ -35,10 +37,12 @@ export default function DashboardClient({
   initialAssignments,
   courses,
   serverNow,
+  aiEnabled,
 }: {
   initialAssignments: Assignment[];
   courses: Course[];
   serverNow: number;
+  aiEnabled: boolean;
 }) {
   const [assignments, setAssignments] = useState(initialAssignments);
   const [now, setNow] = useState(serverNow);
@@ -46,6 +50,7 @@ export default function DashboardClient({
   const [course, setCourse] = useState<string>("all");
   const [showCompleted, setShowCompleted] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => setAssignments(initialAssignments), [initialAssignments]);
@@ -127,9 +132,20 @@ export default function DashboardClient({
             {new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Bangkok", dateStyle: "full" }).format(now)}
           </p>
         </div>
-        <button className="btn-primary" onClick={() => setQuickAddOpen(true)}>
-          <Sparkles className="h-4 w-4" /> Quick Add / Paste Syllabus
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="btn-secondary"
+            onClick={() => setQuickAddOpen(true)}
+            disabled={!aiEnabled}
+            title={aiEnabled ? undefined : "AI is off: add a free GEMINI_API_KEY in Vercel to turn it on"}
+          >
+            <Sparkles className="h-4 w-4 text-gold-600" /> Paste Syllabus (AI)
+            {!aiEnabled && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-500">off</span>}
+          </button>
+          <button className="btn-primary" onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4" /> Add assignment
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -189,8 +205,9 @@ export default function DashboardClient({
             <Inbox className="h-8 w-8 text-slate-300" />
             <p className="font-medium text-slate-700">Nothing pending</p>
             <p className="max-w-sm text-sm text-slate-500">
-              Paste a syllabus or LMS notification with Quick Add, or connect Make.com / n8n to the webhook to sync Teams
-              and Google Classroom automatically.
+              Click <strong>Add assignment</strong> to type in a deadline
+              {aiEnabled ? ", or paste a syllabus with AI" : ""}. You can also connect Make.com / n8n to sync Teams and
+              Google Classroom automatically.
             </p>
           </div>
         )}
@@ -233,6 +250,13 @@ export default function DashboardClient({
           </section>
         )}
       </div>
+
+      <AddAssignmentModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        courses={courseCodes}
+        onCreated={(created) => setAssignments((prev) => [created, ...prev])}
+      />
 
       <QuickAddModal
         open={quickAddOpen}

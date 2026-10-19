@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PracticeClient from "@/components/practice/PracticeClient";
 import SetupNotice from "@/components/SetupNotice";
+import { aiProvider } from "@/lib/ai";
 import { getOwnerId, getSupabaseAdmin } from "@/lib/supabase";
 import type { Course, PracticeSession, QuizQuestion } from "@/lib/types";
 
@@ -35,6 +36,7 @@ export default async function PracticePage({ searchParams }: { searchParams: { c
       initialQuestions={(questions.data ?? []) as QuizQuestion[]}
       initialSessions={(sessions.data ?? []) as PracticeSession[]}
       initialCourse={searchParams.course?.toUpperCase()}
+      aiEnabled={aiProvider() !== null}
     />
   );
 }

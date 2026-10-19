@@ -9,6 +9,7 @@ import {
   History,
   Loader2,
   Play,
+  Plus,
   RotateCcw,
   Sparkles,
   Trash2,
@@ -20,6 +21,7 @@ import { CourseBadge, Tag } from "@/components/ui/badges";
 import { api } from "@/components/ui/api";
 import { formatDate } from "@/lib/dates";
 import type { Course, PracticeSession, QuizQuestion } from "@/lib/types";
+import AddQuestionModal from "./AddQuestionModal";
 import PasteQuizModal from "./PasteQuizModal";
 import QuizRunner, { type AnswerRecord } from "./QuizRunner";
 
@@ -42,11 +44,13 @@ export default function PracticeClient({
   initialQuestions,
   initialSessions,
   initialCourse,
+  aiEnabled,
 }: {
   courses: Course[];
   initialQuestions: QuizQuestion[];
   initialSessions: PracticeSession[];
   initialCourse?: string;
+  aiEnabled: boolean;
 }) {
   const [questions, setQuestions] = useState(initialQuestions);
   const [sessions, setSessions] = useState(initialSessions);
@@ -71,6 +75,7 @@ export default function PracticeClient({
   const [tag, setTag] = useState<string>("all");
   const [saveVariations, setSaveVariations] = useState(true);
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [bankOpen, setBankOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -173,7 +178,8 @@ export default function PracticeClient({
             </button>
             <button
               className="btn-primary"
-              disabled={generating}
+              disabled={generating || !aiEnabled}
+              title={aiEnabled ? undefined : AI_OFF_HINT}
               onClick={() => generateVariation((missed.length ? missed : mode.answers).map((a) => a.question.id))}
             >
               {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
@@ -214,9 +220,15 @@ export default function PracticeClient({
           <h1 className="text-2xl font-bold tracking-tight">Quiz Vault</h1>
           <p className="text-sm text-slate-500">{questions.length} saved questions across {counts.size} courses</p>
         </div>
-        <button className="btn-primary" onClick={() => setPasteOpen(true)}>
-          <ClipboardPaste className="h-4 w-4" /> Drop / Paste Quiz
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-secondary" onClick={() => setPasteOpen(true)} disabled={!aiEnabled} title={aiEnabled ? undefined : AI_OFF_HINT}>
+            <ClipboardPaste className="h-4 w-4" /> Paste Quiz (AI)
+            {!aiEnabled && <OffBadge />}
+          </button>
+          <button className="btn-primary" onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4" /> Add question
+          </button>
+        </div>
       </div>
 
       <div className="mt-5 flex flex-wrap gap-1.5">
@@ -253,7 +265,8 @@ export default function PracticeClient({
 
           {courseQuestions.length === 0 ? (
             <p className="mt-4 text-sm text-slate-500">
-              No questions for this course yet. Use <strong>Drop / Paste Quiz</strong> to add some.
+              No questions for this course yet. Click <strong>Add question</strong> to write one
+              {aiEnabled ? ", or paste a whole quiz with AI" : ""}.
             </p>
           ) : (
             <>
@@ -287,13 +300,15 @@ export default function PracticeClient({
                 </button>
                 <button
                   className="btn-secondary"
-                  disabled={generating}
+                  disabled={generating || !aiEnabled}
+                  title={aiEnabled ? undefined : AI_OFF_HINT}
                   onClick={() => generateVariation(tag === "all" ? undefined : pool.map((q) => q.id).slice(0, 30))}
                 >
                   {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-gold-600" />}
                   {generating ? "AI is writing…" : "Generate AI Variation Quiz"}
+                  {!aiEnabled && <OffBadge />}
                 </button>
-                <label className="ml-1 flex items-center gap-1.5 text-xs text-slate-500">
+                <label className={clsx("ml-1 items-center gap-1.5 text-xs text-slate-500", aiEnabled ? "flex" : "hidden")}>
                   <input
                     type="checkbox"
                     checked={saveVariations}
@@ -382,6 +397,17 @@ export default function PracticeClient({
         </section>
       )}
 
+      <AddQuestionModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        courses={courseCodes}
+        defaultCourse={course}
+        onCreated={(created) => {
+          setQuestions((prev) => [created, ...prev]);
+          setCourse(created.course_code);
+        }}
+      />
+
       <PasteQuizModal
         open={pasteOpen}
         onClose={() => setPasteOpen(false)}
@@ -394,4 +420,10 @@ export default function PracticeClient({
       />
     </div>
   );
+}
+
+const AI_OFF_HINT = "AI is off: add a free GEMINI_API_KEY in Vercel to turn it on";
+
+function OffBadge() {
+  return <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-500">off</span>;
 }
