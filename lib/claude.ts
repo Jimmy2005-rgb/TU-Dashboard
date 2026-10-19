@@ -18,8 +18,9 @@ let client: Anthropic | null = null;
 
 function getClaude(): Anthropic {
   if (client) return client;
-  if (!process.env.ANTHROPIC_API_KEY) throw new AiError("ANTHROPIC_API_KEY is not set.", 503);
-  client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 2 });
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) throw new AiError("ANTHROPIC_API_KEY is not set.", 503);
+  client = new Anthropic({ apiKey, maxRetries: 2 });
   return client;
 }
 

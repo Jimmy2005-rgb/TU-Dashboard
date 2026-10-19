@@ -13,8 +13,10 @@ let client: GoogleGenAI | null = null;
 
 function getGemini(): GoogleGenAI {
   if (client) return client;
-  if (!process.env.GEMINI_API_KEY) throw new AiError("GEMINI_API_KEY is not set.", 503);
-  client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  // Trim: a key pasted into Vercel with a stray space or line break is rejected by Google.
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new AiError("GEMINI_API_KEY is not set.", 503);
+  client = new GoogleGenAI({ apiKey });
   return client;
 }
 
@@ -92,7 +94,9 @@ export function describeGeminiError(err: unknown): { message: string; status: nu
   if (err.status === 429) {
     return { message: "Free Gemini limit reached — wait a minute and try again.", status: 429 };
   }
-  if (err.status === 400 && /api key/i.test(err.message)) return { message: "Invalid GEMINI_API_KEY.", status: 502 };
+  if (err.status === 400 && /api key/i.test(err.message)) {
+    return { message: "Google rejected the Gemini key (API key not valid). Re-copy it from AI Studio into GEMINI_API_KEY in Vercel, then redeploy.", status: 502 };
+  }
   if (err.status === 401 || err.status === 403) return { message: "Invalid GEMINI_API_KEY.", status: 502 };
   if (err.status === 404) return { message: `Gemini model "${GEMINI_MODEL}" not found. Set GEMINI_MODEL.`, status: 502 };
   return { message: `Gemini API error (${err.status}).`, status: 502 };

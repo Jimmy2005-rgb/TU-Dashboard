@@ -14,8 +14,8 @@ export type AiProvider = "claude" | "gemini";
 export function aiProvider(): AiProvider | null {
   const forced = process.env.AI_PROVIDER;
   if (forced === "claude" || forced === "gemini") return forced;
-  if (process.env.ANTHROPIC_API_KEY) return "claude";
-  if (process.env.GEMINI_API_KEY) return "gemini";
+  if (process.env.ANTHROPIC_API_KEY?.trim()) return "claude";
+  if (process.env.GEMINI_API_KEY?.trim()) return "gemini";
   return null;
 }
 
