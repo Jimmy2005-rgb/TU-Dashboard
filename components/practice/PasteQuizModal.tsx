@@ -73,7 +73,7 @@ export default function PasteQuizModal({
       open={open}
       onClose={close}
       title="Drop / Paste Quiz"
-      description="Claude structures the questions, finds the answers and writes step-by-step explanations."
+      description="AI structures the questions, finds the answers and writes step-by-step explanations."
       wide
     >
       {result && result.count > 0 ? (

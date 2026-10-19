@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { parseQuizWithClaude } from "@/lib/ai-tasks";
-import { claudeErrorStatus, describeClaudeError } from "@/lib/claude";
+import { parseQuizWithAI } from "@/lib/ai-tasks";
+import { aiErrorStatus, describeAiError } from "@/lib/ai";
 import { jsonError, readJson } from "@/lib/http";
 import { ParseQuizRequest } from "@/lib/schemas";
 import { ensureCourses, getSupabaseAdmin, normalizeCourseCode } from "@/lib/supabase";
@@ -12,7 +12,7 @@ export const maxDuration = 120;
 /**
  * POST /api/parse-quiz
  * Body: { text, course_code }
- * Claude cleans scraped quiz text into questions, options, answers and worked
+ * The AI cleans scraped quiz text into questions, options, answers and worked
  * explanations, saved to `quiz_bank`.
  */
 export async function POST(req: Request) {
@@ -32,10 +32,10 @@ export async function POST(req: Request) {
 
   let questions;
   try {
-    questions = await parseQuizWithClaude(parsed.data.text, course ?? { course_code: courseCode, name: courseCode });
+    questions = await parseQuizWithAI(parsed.data.text, course ?? { course_code: courseCode, name: courseCode });
   } catch (err) {
-    console.error("[parse-quiz] Claude error", err);
-    return jsonError(describeClaudeError(err), claudeErrorStatus(err));
+    console.error("[parse-quiz] AI error", err);
+    return jsonError(describeAiError(err), aiErrorStatus(err));
   }
 
   if (questions.length === 0) {

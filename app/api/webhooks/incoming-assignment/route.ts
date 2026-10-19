@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { parseAssignmentsWithClaude } from "@/lib/ai-tasks";
-import { describeClaudeError } from "@/lib/claude";
+import { parseAssignmentsWithAI } from "@/lib/ai-tasks";
+import { describeAiError } from "@/lib/ai";
 import { parseIncomingDate } from "@/lib/dates";
 import { jsonError, readJson } from "@/lib/http";
 import { WebhookPayload, type WebhookItem } from "@/lib/schemas";
@@ -60,8 +60,8 @@ async function itemToRows(item: WebhookItem, userId: string): Promise<{ rows: Ro
     };
   }
 
-  // Unstructured payload (e.g. a forwarded email body): let Claude extract tasks.
-  const parsed = await parseAssignmentsWithClaude(item.raw_text ?? "", courseCode);
+  // Unstructured payload (e.g. a forwarded email body): let the AI extract tasks.
+  const parsed = await parseAssignmentsWithAI(item.raw_text ?? "", courseCode);
   return {
     rows: parsed.assignments.map((a, i) => ({
       ...base,
@@ -83,7 +83,7 @@ async function itemToRows(item: WebhookItem, userId: string): Promise<{ rows: Ro
  * Body: one item or { "assignments": [ ...items ] }, where an item is
  *   { source_platform, title, description?, due_date?, course_code?,
  *     course_name?, external_link?, external_id? }
- * or { source_platform, raw_text, external_id? } to have Claude parse it.
+ * or { source_platform, raw_text, external_id? } to have the AI parse it.
  *
  * Items with an external_id are upserted, so retries never create duplicates.
  */
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
     }
   } catch (err) {
     console.error("[webhook] parse error", err);
-    return jsonError(describeClaudeError(err), 502);
+    return jsonError(describeAiError(err), 502);
   }
 
   if (rows.length === 0) return NextResponse.json({ received: items.length, saved: 0, ids: [] });

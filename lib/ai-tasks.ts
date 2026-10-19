@@ -1,4 +1,4 @@
-import { bangkokNow, extractStructured } from "./claude";
+import { bangkokNow, extractStructured } from "./ai";
 import { parseIncomingDate } from "./dates";
 import {
   ParsedAssignmentsSchema,
@@ -24,7 +24,7 @@ Rules:
 - Keep descriptions concise: deliverables, format, weighting, submission channel.
 - courses_detected: each course mentioned with its name and professor if stated.`;
 
-export async function parseAssignmentsWithClaude(
+export async function parseAssignmentsWithAI(
   text: string,
   defaultCourseCode?: string | null,
 ): Promise<ParsedAssignments> {
@@ -79,7 +79,7 @@ For each new question:
 - explanation: a step-by-step worked solution.
 - tags: reuse the source tags where relevant and add "ai-variation".`;
 
-/** Reconcile Claude's answer with the options list, e.g. "B" → the 2nd option. */
+/** Reconcile the AI's answer with the options list, e.g. "B" → the 2nd option. */
 export function normalizeQuestion(q: ParsedQuestion): NormalizedQuestion {
   const declaredOpen = /open/i.test(q.question_type);
   const options = declaredOpen ? [] : q.options.map((o) => o.trim()).filter(Boolean);
@@ -103,13 +103,13 @@ export function normalizeQuestion(q: ParsedQuestion): NormalizedQuestion {
   };
 }
 
-export async function parseQuizWithClaude(text: string, course: Pick<Course, "course_code" | "name">) {
+export async function parseQuizWithAI(text: string, course: Pick<Course, "course_code" | "name">) {
   const input = `Course: ${course.course_code} — ${course.name}\n\n<quiz_text>\n${text}\n</quiz_text>`;
   const result = await extractStructured({ system: QUIZ_SYSTEM, input, schema: ParsedQuizSchema });
   return result.questions.map(normalizeQuestion).filter((q) => q.question_text && q.correct_answer);
 }
 
-export async function generateVariationsWithClaude(
+export async function generateVariationsWithAI(
   course: Pick<Course, "course_code" | "name">,
   sources: Pick<QuizQuestion, "question_text" | "question_type" | "options" | "correct_answer" | "tags">[],
   count: number,

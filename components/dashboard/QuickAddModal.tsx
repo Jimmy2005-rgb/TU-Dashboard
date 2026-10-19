@@ -68,7 +68,7 @@ export default function QuickAddModal({
       open={open}
       onClose={close}
       title="Quick Add / Paste Syllabus"
-      description="Claude extracts every deadline and saves it to your dashboard."
+      description="AI extracts every deadline and saves it to your dashboard."
       wide
     >
       {created && created.length > 0 ? (
@@ -134,7 +134,7 @@ export default function QuickAddModal({
             </button>
             <button className="btn-primary" onClick={submit} disabled={loading || text.trim().length < 5}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {loading ? "Claude is reading…" : "Extract & Save"}
+              {loading ? "AI is reading…" : "Extract & Save"}
             </button>
           </div>
         </div>

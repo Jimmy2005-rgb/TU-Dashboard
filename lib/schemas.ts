@@ -1,6 +1,6 @@
 import * as z from "zod";
 
-// ─── Claude output schemas (structured outputs) ───────────────────────────
+// ─── AI output schemas (structured outputs) ───────────────────────────
 // Keep these simple: every field required, `nullable()` instead of optional,
 // no length/range constraints — the API enforces the JSON shape for us.
 
@@ -127,7 +127,7 @@ const WebhookItem = z.object({
   course_name: z.string().max(200).nullish(),
   external_link: z.string().max(2000).nullish(),
   external_id: z.string().max(500).nullish(),
-  /** Alternative to structured fields: raw text (e.g. an email body) for Claude to parse. */
+  /** Alternative to structured fields: raw text (e.g. an email body) for the AI to parse. */
   raw_text: z.string().max(50_000).nullish(),
 });
 export type WebhookItem = z.infer<typeof WebhookItem>;

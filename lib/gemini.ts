@@ -1,0 +1,98 @@
+import { ApiError, FinishReason, GoogleGenAI, type Content } from "@google/genai";
+import * as z from "zod";
+import { AiError, type ChatOptions, type ExtractOptions } from "./ai-shared";
+
+/**
+ * Default (free) provider: Google Gemini. `gemini-3.8-flash` is on the Gemini
+ * API free tier; override with GEMINI_MODEL (e.g. "gemini-3.5-flash-lite" for
+ * higher free-tier limits).
+ */
+export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+
+let client: GoogleGenAI | null = null;
+
+function getGemini(): GoogleGenAI {
+  if (client) return client;
+  if (!process.env.GEMINI_API_KEY) throw new AiError("GEMINI_API_KEY is not set.", 503);
+  client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  return client;
+}
+
+/** Zod → JSON Schema in the subset Gemini accepts (it rejects the `$schema` keyword). */
+function toGeminiSchema(schema: z.ZodType): Record<string, unknown> {
+  const json = z.toJSONSchema(schema) as Record<string, unknown>;
+  delete json.$schema;
+  return json;
+}
+
+function toContents(messages: ChatOptions["messages"]): Content[] {
+  return messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
+}
+
+/** Structured extraction: Gemini returns JSON constrained to `schema`, validated again with Zod. */
+export async function geminiExtract<S extends z.ZodType>(opts: ExtractOptions<S>): Promise<z.infer<S>> {
+  const response = await getGemini().models.generateContent({
+    model: GEMINI_MODEL,
+    contents: opts.input,
+    config: {
+      systemInstruction: opts.system,
+      responseMimeType: "application/json",
+      responseJsonSchema: toGeminiSchema(opts.schema),
+      maxOutputTokens: opts.maxTokens ?? 32000,
+    },
+  });
+
+  const finish = response.candidates?.[0]?.finishReason;
+  if (finish === FinishReason.SAFETY || finish === FinishReason.RECITATION || response.promptFeedback?.blockReason) {
+    throw new AiError("The AI declined to process this text. Try rephrasing or trimming it.", 422);
+  }
+  if (finish === FinishReason.MAX_TOKENS) {
+    throw new AiError("The text is too long to process in one go. Split it into smaller parts.", 413);
+  }
+
+  const text = response.text;
+  if (!text) throw new AiError("The AI returned an empty result.");
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new AiError("The AI returned malformed JSON. Please try again.");
+  }
+  const parsed = opts.schema.safeParse(data);
+  if (!parsed.success) throw new AiError("The AI's answer didn't match the expected format. Please try again.");
+  return parsed.data;
+}
+
+/** Yields a tutor reply as it is generated. */
+export async function* geminiStreamText(opts: ChatOptions): AsyncGenerator<string> {
+  const stream = await getGemini().models.generateContentStream({
+    model: GEMINI_MODEL,
+    contents: toContents(opts.messages),
+    config: { systemInstruction: opts.system },
+  });
+
+  let finish: FinishReason | undefined;
+  for await (const chunk of stream) {
+    const text = chunk.text;
+    if (text) yield text;
+    finish = chunk.candidates?.[0]?.finishReason ?? finish;
+  }
+
+  if (finish === FinishReason.SAFETY || finish === FinishReason.RECITATION) {
+    yield "\n\n_(The tutor couldn't answer that one. Try rephrasing.)_";
+  } else if (finish === FinishReason.MAX_TOKENS) {
+    yield "\n\n_(Answer truncated — ask me to continue.)_";
+  }
+}
+
+/** Human-readable message for a Gemini SDK error, or null if it isn't one. */
+export function describeGeminiError(err: unknown): { message: string; status: number } | null {
+  if (!(err instanceof ApiError)) return null;
+  if (err.status === 429) {
+    return { message: "Free Gemini limit reached — wait a minute and try again.", status: 429 };
+  }
+  if (err.status === 400 && /api key/i.test(err.message)) return { message: "Invalid GEMINI_API_KEY.", status: 502 };
+  if (err.status === 401 || err.status === 403) return { message: "Invalid GEMINI_API_KEY.", status: 502 };
+  if (err.status === 404) return { message: `Gemini model "${GEMINI_MODEL}" not found. Set GEMINI_MODEL.`, status: 502 };
+  return { message: `Gemini API error (${err.status}).`, status: 502 };
+}

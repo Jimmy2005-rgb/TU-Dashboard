@@ -1,5 +1,5 @@
 import { tutorSystemPrompt } from "@/lib/ai-tasks";
-import { streamChat } from "@/lib/claude";
+import { streamChat } from "@/lib/ai";
 import { jsonError, readJson } from "@/lib/http";
 import { TutorRequest } from "@/lib/schemas";
 import { getSupabaseAdmin, normalizeCourseCode } from "@/lib/supabase";

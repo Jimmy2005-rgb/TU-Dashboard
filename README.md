@@ -1,8 +1,10 @@
 # TU BBA Academic Hub & Quiz Vault
 
-A personal web app for Thammasat University BBA students. It brings MS Teams and Google Classroom deadlines into one dashboard, turns pasted quizzes into a practice bank, and gives you a Claude-powered tutor for each course.
+A personal web app for Thammasat University BBA students. It brings MS Teams and Google Classroom deadlines into one dashboard, turns pasted quizzes into a practice bank, and gives you an AI tutor for each course.
 
-**Stack:** Next.js 14 (App Router, TypeScript) · Tailwind CSS · Lucide icons · Supabase (Postgres + RLS) · Anthropic Claude API · Vercel
+**Runs for free:** Vercel Hobby, the Supabase Free plan and the Google Gemini API free tier. You can switch the AI to Anthropic Claude (paid) by adding one environment variable.
+
+**Stack:** Next.js 14 (App Router, TypeScript) · Tailwind CSS · Lucide icons · Supabase (Postgres + RLS) · Google Gemini API (free) or Anthropic Claude API · Vercel
 
 ---
 
@@ -10,13 +12,13 @@ A personal web app for Thammasat University BBA students. It brings MS Teams and
 
 | Area | What it does |
 |---|---|
-| **Dashboard** `/dashboard` | Deadlines grouped by urgency: Overdue, < 48 Hours, This Week, Later, No Due Date. Filter by platform (Teams / Classroom / Manual) or course code. One click marks an item complete, with an optimistic update saved to Supabase. **Quick Add / Paste Syllabus** sends raw text to Claude, which extracts every deadline and saves them. |
-| **Quiz Vault** `/practice` | **Drop / Paste Quiz:** paste scraped Google Forms, Moodle or PDF text and Claude turns it into questions, options, answers and step-by-step explanations. **Practice mode** gives instant feedback, explanations and a score, and keeps a history of your sessions. **Generate AI Variation Quiz** writes new numerical or scenario versions of your questions, starting with the ones you missed. |
-| **Course Hub** `/courses/[code]` | Course progress, saved materials (links and notes), saved questions, practice average, and a slide-over **Claude tutor** set up for that course. It answers in Thai or English. |
-| **Webhook** `/api/webhooks/incoming-assignment` | Takes JSON from Make.com or n8n, protected by a secret header. You can send structured fields or raw text for Claude to parse. Items are upserted by `external_id`, so retries don't create duplicates. |
-| **Access control** | Set `APP_PASSWORD` to put a single password in front of every page and API route. This stops other people from reading your data or using up your Claude credits. |
+| **Dashboard** `/dashboard` | Deadlines grouped by urgency: Overdue, < 48 Hours, This Week, Later, No Due Date. Filter by platform (Teams / Classroom / Manual) or course code. One click marks an item complete, with an optimistic update saved to Supabase. **Quick Add / Paste Syllabus** sends raw text to the AI, which extracts every deadline and saves them. |
+| **Quiz Vault** `/practice` | **Drop / Paste Quiz:** paste scraped Google Forms, Moodle or PDF text and the AI turns it into questions, options, answers and step-by-step explanations. **Practice mode** gives instant feedback, explanations and a score, and keeps a history of your sessions. **Generate AI Variation Quiz** writes new numerical or scenario versions of your questions, starting with the ones you missed. |
+| **Course Hub** `/courses/[code]` | Course progress, saved materials (links and notes), saved questions, practice average, and a slide-over **AI tutor** set up for that course. It answers in Thai or English. |
+| **Webhook** `/api/webhooks/incoming-assignment` | Takes JSON from Make.com or n8n, protected by a secret header. You can send structured fields or raw text for the AI to parse. Items are upserted by `external_id`, so retries don't create duplicates. |
+| **Access control** | Set `APP_PASSWORD` to put a single password in front of every page and API route. This stops other people from reading your data or using up your AI quota. |
 
-> **Model note:** the original spec asked for `claude-3-5-sonnet`, but Anthropic retired that model in October 2025. The app uses **`claude-sonnet-5-5`** by default, and you can change it with `CLAUDE_MODEL`. If Claude's safety filter wrongly declines a request, server-side fallback retries it on another model automatically.
+> **AI provider:** the app uses **Google Gemini** (`gemini-3.8-flash`, free tier) when `GEMINI_API_KEY` is set. If you add `ANTHROPIC_API_KEY`, it switches to **Claude** (`claude-sonnet-5-5`, paid). Claude replaces the original spec's `claude-3-5-sonnet`, which Anthropic retired in October 2025. Set `AI_PROVIDER=gemini` or `claude` to force one. The free Gemini tier has per-minute and per-day request limits. If you hit them, the app says so; wait a minute, or set `GEMINI_MODEL=gemini-3.5-flash-lite` for higher limits.
 
 ---
 
@@ -37,10 +39,10 @@ A personal web app for Thammasat University BBA students. It brings MS Teams and
 │   │   ├── page.tsx                # Course cards
 │   │   └── [code]/page.tsx         # Course resource hub
 │   └── api/
-│       ├── parse-assignment/route.ts          # Claude: text → assignments → DB
-│       ├── parse-quiz/route.ts                # Claude: quiz text → quiz_bank
-│       ├── generate-variation/route.ts        # Claude: fresh variations of saved questions
-│       ├── tutor/route.ts                     # Claude: streaming course tutor
+│       ├── parse-assignment/route.ts          # AI: text → assignments → DB
+│       ├── parse-quiz/route.ts                # AI: quiz text → quiz_bank
+│       ├── generate-variation/route.ts        # AI: fresh variations of saved questions
+│       ├── tutor/route.ts                     # AI: streaming course tutor
 │       ├── practice-sessions/route.ts         # Save a practice result
 │       ├── assignments/[id]/route.ts          # PATCH status / DELETE
 │       ├── quiz/[id]/route.ts                 # DELETE question
@@ -59,9 +61,12 @@ A personal web app for Thammasat University BBA students. It brings MS Teams and
 │   └── courses/                    # CourseDetailClient, TutorPanel, AddCourseButton
 ├── lib/
 │   ├── supabase.ts                 # Server-only Supabase client (service role)
-│   ├── claude.ts                   # Anthropic client, structured extraction, streaming
+│   ├── ai.ts                       # Picks Gemini or Claude; structured extraction + streaming
+│   ├── gemini.ts                   # Google Gemini provider (free tier)
+│   ├── claude.ts                   # Anthropic Claude provider (optional, paid)
+│   ├── ai-shared.ts                # Shared AI types and errors
 │   ├── ai-tasks.ts                 # Prompts: assignments, quizzes, variations, tutor
-│   ├── schemas.ts                  # Zod schemas (Claude output + request bodies)
+│   ├── schemas.ts                  # Zod schemas (AI output + request bodies)
 │   ├── auth.ts                     # Password gate helpers
 │   ├── dates.ts                    # Bangkok-time formatting & urgency buckets
 │   ├── http.ts                     # JSON error/validation helpers
@@ -163,11 +168,11 @@ git push -u origin main
    |---|---|
    | `NEXT_PUBLIC_SUPABASE_URL` | `https://<ref>.supabase.co` |
    | `SUPABASE_SERVICE_ROLE_KEY` | service_role key from Supabase |
-   | `ANTHROPIC_API_KEY` | from [console.anthropic.com](https://console.anthropic.com/settings/keys) |
+   | `GEMINI_API_KEY` | free, from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
    | `WEBHOOK_SECRET` | a long random string (`openssl rand -hex 32`) |
    | `APP_PASSWORD` | your login password (**strongly recommended**) |
    | `OWNER_USER_ID` | optional; any fixed UUID, default `00000000-0000-0000-0000-000000000001` |
-   | `CLAUDE_MODEL` | optional; default `claude-sonnet-5-5` |
+   | `ANTHROPIC_API_KEY` | optional (paid); switches the AI to Claude |
 
 3. Click **Deploy**. After that, every push to `main` redeploys automatically.
 4. Optional: in **Project Settings → Functions**, set the region to **Singapore (sin1)** so the app runs close to Supabase.
@@ -202,7 +207,7 @@ git push -u origin main
 - If you leave out `course_code`, it is taken from `course_name` when possible (e.g. `"FN201 Business Finance (Sec 1)"` → `FN201`). Unknown courses are created automatically.
 - Always send `external_id` (the Classroom courseWork ID or the Teams assignment ID). This lets a retried or repeated scenario update the existing row instead of adding a duplicate.
 
-**Unstructured payload:** forward an email or Teams message and Claude extracts the tasks:
+**Unstructured payload:** forward an email or Teams message and the AI extracts the tasks:
 
 ```json
 { "source_platform": "ms_teams", "external_id": "teams-msg-789", "raw_text": "Hi class, the AC201 case report is due next Friday..." }
@@ -222,7 +227,7 @@ curl -X POST https://<your-app>.vercel.app/api/webhooks/incoming-assignment -H "
 ### n8n recipe
 
 1. Trigger: **Google Classroom** node (Course Work → Get Many, on a Schedule trigger) or a **Microsoft Teams / Outlook Trigger** node.
-2. **HTTP Request** node: POST, *Send Headers* → `x-webhook-secret`, *Send Body* → JSON with the fields above. For Teams messages, send `raw_text` and let Claude parse it.
+2. **HTTP Request** node: POST, *Send Headers* → `x-webhook-secret`, *Send Body* → JSON with the fields above. For Teams messages, send `raw_text` and let the AI parse it.
 
 ---
 
@@ -232,7 +237,10 @@ curl -X POST https://<your-app>.vercel.app/api/webhooks/incoming-assignment -H "
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Server-side DB access (bypasses RLS; never expose it) |
-| `ANTHROPIC_API_KEY` | ✅ | Claude API |
+| `GEMINI_API_KEY` | ✅ (or Claude) | Free Google Gemini API key |
+| `GEMINI_MODEL` | Optional | Defaults to `gemini-3.8-flash` |
+| `ANTHROPIC_API_KEY` | Optional | Paid Claude API; used instead of Gemini when set |
+| `AI_PROVIDER` | Optional | `gemini` or `claude` to force a provider |
 | `WEBHOOK_SECRET` | ✅ for webhooks | Shared secret for Make.com / n8n |
 | `APP_PASSWORD` | Recommended | Password-protects the app. If unset, the app is open to anyone with the URL. |
 | `OWNER_USER_ID` | Optional | UUID stored in `user_id` columns |

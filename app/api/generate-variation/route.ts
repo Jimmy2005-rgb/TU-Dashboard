@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { generateVariationsWithClaude } from "@/lib/ai-tasks";
-import { claudeErrorStatus, describeClaudeError } from "@/lib/claude";
+import { generateVariationsWithAI } from "@/lib/ai-tasks";
+import { aiErrorStatus, describeAiError } from "@/lib/ai";
 import { jsonError, readJson } from "@/lib/http";
 import { GenerateVariationRequest } from "@/lib/schemas";
 import { getSupabaseAdmin, normalizeCourseCode } from "@/lib/supabase";
@@ -12,7 +12,7 @@ export const maxDuration = 180;
 /**
  * POST /api/generate-variation
  * Body: { course_code, question_ids?, count?, save? }
- * Claude writes fresh numerical/scenario variations of saved questions.
+ * The AI writes fresh numerical/scenario variations of saved questions.
  * With save=true (default) they are added to the bank tagged "ai-variation".
  */
 export async function POST(req: Request) {
@@ -41,10 +41,10 @@ export async function POST(req: Request) {
 
   let generated;
   try {
-    generated = await generateVariationsWithClaude(course, sources, count);
+    generated = await generateVariationsWithAI(course, sources, count);
   } catch (err) {
-    console.error("[generate-variation] Claude error", err);
-    return jsonError(describeClaudeError(err), claudeErrorStatus(err));
+    console.error("[generate-variation] AI error", err);
+    return jsonError(describeAiError(err), aiErrorStatus(err));
   }
 
   if (!save) {

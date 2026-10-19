@@ -97,7 +97,7 @@ export default function PracticeClient({
       });
       if (saveVariations) setQuestions((prev) => [...res.questions, ...prev]);
       if (res.questions.length) start(res.questions, "ai_variation");
-      else setError("Claude didn't return any questions. Try again.");
+      else setError("The AI didn't return any questions. Try again.");
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -291,7 +291,7 @@ export default function PracticeClient({
                   onClick={() => generateVariation(tag === "all" ? undefined : pool.map((q) => q.id).slice(0, 30))}
                 >
                   {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-gold-600" />}
-                  {generating ? "Claude is writing…" : "Generate AI Variation Quiz"}
+                  {generating ? "AI is writing…" : "Generate AI Variation Quiz"}
                 </button>
                 <label className="ml-1 flex items-center gap-1.5 text-xs text-slate-500">
                   <input

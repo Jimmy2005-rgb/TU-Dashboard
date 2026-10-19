@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { parseAssignmentsWithClaude } from "@/lib/ai-tasks";
-import { claudeErrorStatus, describeClaudeError } from "@/lib/claude";
+import { parseAssignmentsWithAI } from "@/lib/ai-tasks";
+import { aiErrorStatus, describeAiError } from "@/lib/ai";
 import { jsonError, readJson } from "@/lib/http";
 import { ParseAssignmentRequest } from "@/lib/schemas";
 import { ensureCourses, getOwnerId, getSupabaseAdmin } from "@/lib/supabase";
@@ -12,7 +12,7 @@ export const maxDuration = 60;
 /**
  * POST /api/parse-assignment
  * Body: { text, source_platform?, default_course_code? }
- * Claude turns a syllabus / notification / email into structured deadlines,
+ * The AI turns a syllabus / notification / email into structured deadlines,
  * which are saved straight to the `assignments` table.
  */
 export async function POST(req: Request) {
@@ -22,10 +22,10 @@ export async function POST(req: Request) {
 
   let result;
   try {
-    result = await parseAssignmentsWithClaude(text, default_course_code);
+    result = await parseAssignmentsWithAI(text, default_course_code);
   } catch (err) {
-    console.error("[parse-assignment] Claude error", err);
-    return jsonError(describeClaudeError(err), claudeErrorStatus(err));
+    console.error("[parse-assignment] AI error", err);
+    return jsonError(describeAiError(err), aiErrorStatus(err));
   }
 
   if (result.assignments.length === 0) {
