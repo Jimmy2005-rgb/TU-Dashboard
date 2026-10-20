@@ -258,9 +258,22 @@ export const CreateGradeItemRequest = z
   })
   .refine((i) => i.score <= i.max_score * 1.5, { message: "Score looks bigger than the maximum.", path: ["score"] });
 
-export const UpdateCourseTargetRequest = z.object({
-  target_percent: z.coerce.number().min(0).max(100),
-});
+/** Letter grades with minimum percents, highest first; checked further with scaleProblem(). */
+export const GradeScaleSchema = z
+  .array(z.object({ letter: z.string().trim().min(1).max(4), min: z.coerce.number().min(0).max(100) }))
+  .min(2)
+  .max(15);
+
+export const UpdateCourseTargetRequest = z
+  .object({
+    target_percent: z.coerce.number().min(0).max(100),
+    /** null = go back to the default scale. */
+    grade_scale: GradeScaleSchema.nullable(),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, { message: "Nothing to update." });
+
+export const UpdateDefaultScaleRequest = z.object({ grade_scale: GradeScaleSchema.nullable() });
 
 export const ParseOutlineRequest = z.object({
   course_code: z.string().trim().min(5).max(10),

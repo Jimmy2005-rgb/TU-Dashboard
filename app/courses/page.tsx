@@ -5,7 +5,8 @@ import AddCourseButton from "@/components/courses/AddCourseButton";
 import SetupNotice from "@/components/SetupNotice";
 import { getOwnerId, getSupabaseAdmin } from "@/lib/supabase";
 import { assignCourseColors } from "@/lib/course-colors";
-import { fmtPct, letterFor, summarize } from "@/lib/grades";
+import { fmtPct, letterFor, resolveScale, summarize } from "@/lib/grades";
+import { loadSchedule } from "@/lib/schedule-data";
 import { plural } from "@/lib/text";
 import type { Course, GradeComponent, GradeItem } from "@/lib/types";
 
@@ -48,6 +49,7 @@ export default async function CoursesPage() {
   for (const m of materials.data ?? []) get(m.course_code).materials++;
 
   const list = (courses.data ?? []) as Course[];
+  const { settings } = await loadSchedule();
   const colors = assignCourseColors(list);
   const allParts = (components.data ?? []) as GradeComponent[];
   const allItems = (gradeItems.data ?? []) as GradeItem[];
@@ -112,7 +114,7 @@ export default async function CoursesPage() {
                   <p className="mt-3 text-xs text-slate-500">
                     Grade so far{" "}
                     <span className="font-semibold text-slate-900">
-                      {fmtPct(grade.currentPercent, 0)} · {letterFor(grade.currentPercent)}
+                      {fmtPct(grade.currentPercent, 1)} · {letterFor(grade.currentPercent, resolveScale(c.grade_scale, settings?.grade_scale))}
                     </span>{" "}
                     <span className="text-slate-400">({fmtPct(grade.gradedWeight, 0)} graded)</span>
                   </p>

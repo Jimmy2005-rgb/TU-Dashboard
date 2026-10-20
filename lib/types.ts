@@ -11,6 +11,8 @@ export interface Course {
   target_percent: number;
   /** Colour slot 1–14, or null for automatic. */
   color: number | null;
+  /** This course's own letter-grade cut-offs, or null to use the student's default. */
+  grade_scale?: { letter: string; min: number }[] | null;
   created_at: string;
 }
 
@@ -118,6 +120,8 @@ export interface StudySettings {
   semester_start: string | null; // YYYY-MM-DD
   semester_end: string | null;
   no_class_days: NoClassPeriod[];
+  /** Default letter-grade cut-offs for all courses (null = built-in default). */
+  grade_scale?: { letter: string; min: number }[] | null;
   updated_at: string;
 }
 

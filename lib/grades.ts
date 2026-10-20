@@ -1,23 +1,56 @@
 import type { GradeComponent, GradeItem } from "./types";
 
-/**
- * Letter-grade cut-offs commonly used at Thammasat (percent). Individual
- * professors may curve or use different cut-offs, so treat as an estimate.
- */
-export const LETTER_SCALE = [
-  { letter: "A", min: 80 },
-  { letter: "B+", min: 75 },
-  { letter: "B", min: 70 },
-  { letter: "C+", min: 65 },
-  { letter: "C", min: 60 },
-  { letter: "D+", min: 55 },
-  { letter: "D", min: 50 },
-  { letter: "F", min: 0 },
-] as const;
+/** Letter grades with the minimum percent for each, highest first. The last row is the fail grade (min 0). */
+export type GradeScale = { letter: string; min: number }[];
 
-export function letterFor(percent: number | null): string {
+/** Default cut-offs (A ≥ 85, B+ 80–84 … F ≤ 54). Editable per student and per course. */
+export const DEFAULT_GRADE_SCALE: GradeScale = [
+  { letter: "A", min: 85 },
+  { letter: "B+", min: 80 },
+  { letter: "B", min: 75 },
+  { letter: "C+", min: 70 },
+  { letter: "C", min: 65 },
+  { letter: "D+", min: 60 },
+  { letter: "D", min: 55 },
+  { letter: "F", min: 0 },
+];
+
+/** The scale that applies: the course's own, else the student's default, else the built-in one. */
+export function resolveScale(courseScale?: GradeScale | null, defaultScale?: GradeScale | null): GradeScale {
+  return courseScale?.length ? courseScale : defaultScale?.length ? defaultScale : DEFAULT_GRADE_SCALE;
+}
+
+export function letterFor(percent: number | null, scale: GradeScale = DEFAULT_GRADE_SCALE): string {
   if (percent == null || Number.isNaN(percent)) return "—";
-  return LETTER_SCALE.find((g) => percent >= g.min)?.letter ?? "F";
+  return scale.find((g) => percent >= g.min)?.letter ?? scale[scale.length - 1]?.letter ?? "F";
+}
+
+const num = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
+/** "≥ 85", "80 – 84", "≤ 54" — the way grade tables are printed in course outlines. */
+export function scaleRanges(scale: GradeScale): { letter: string; range: string }[] {
+  return scale.map((g, i) => {
+    if (i === 0) return { letter: g.letter, range: `≥ ${num(g.min)}` };
+    const below = scale[i - 1].min;
+    const top = Number.isInteger(below) && Number.isInteger(g.min) ? num(below - 1) : `<${num(below)}`;
+    if (i === scale.length - 1) return { letter: g.letter, range: `≤ ${top.replace("<", "< ")}` };
+    return { letter: g.letter, range: `${num(g.min)} – ${top}` };
+  });
+}
+
+/** Why a scale is invalid, or null if it's fine. */
+export function scaleProblem(scale: GradeScale): string | null {
+  if (scale.length < 2) return "Add at least two grades.";
+  const letters = scale.map((g) => g.letter.trim().toUpperCase());
+  if (letters.some((l) => !l)) return "Every row needs a letter.";
+  if (new Set(letters).size !== letters.length) return "Each letter can only appear once.";
+  for (let i = 0; i < scale.length; i++) {
+    const m = scale[i].min;
+    if (!Number.isFinite(m) || m < 0 || m > 100) return `${scale[i].letter}: the minimum must be between 0 and 100.`;
+    if (i > 0 && m >= scale[i - 1].min) return `${scale[i].letter} must start below ${scale[i - 1].letter} (${scale[i - 1].min}).`;
+  }
+  if (scale[scale.length - 1].min !== 0) return "The last grade must start at 0.";
+  return null;
 }
 
 /** Percent scored in one part: total points earned / total points possible. */

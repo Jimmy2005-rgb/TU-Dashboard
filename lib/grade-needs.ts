@@ -1,4 +1,4 @@
-import { letterFor, neededOnRemaining, summarize } from "./grades";
+import { letterFor, neededOnRemaining, resolveScale, summarize, type GradeScale } from "./grades";
 import { getOwnerId, getSupabaseAdmin } from "./supabase";
 import type { Course, GradeComponent, GradeItem } from "./types";
 
@@ -12,7 +12,7 @@ export interface GradeNeed {
   currentPercent: number | null;
 }
 
-export async function loadGradeNeeds(courses: Pick<Course, "course_code" | "target_percent">[]): Promise<Record<string, GradeNeed>> {
+export async function loadGradeNeeds(courses: Pick<Course, "course_code" | "target_percent" | "grade_scale">[]): Promise<Record<string, GradeNeed>> {
   if (!courses.length) return {};
   const db = getSupabaseAdmin();
   const userId = getOwnerId();
@@ -20,6 +20,7 @@ export async function loadGradeNeeds(courses: Pick<Course, "course_code" | "targ
   const { data: components } = await db.from("grade_components").select("*").eq("user_id", userId).in("course_code", codes);
   const ids = (components ?? []).map((c) => c.id as string);
   const { data: items } = ids.length ? await db.from("grade_items").select("*").in("component_id", ids) : { data: [] };
+  const { data: settings } = await db.from("study_settings").select("grade_scale").eq("user_id", userId).maybeSingle<{ grade_scale: GradeScale | null }>();
 
   const out: Record<string, GradeNeed> = {};
   for (const c of courses) {
@@ -30,7 +31,7 @@ export async function loadGradeNeeds(courses: Pick<Course, "course_code" | "targ
     out[c.course_code] = {
       needed: summary.gradedWeight > 0 ? neededOnRemaining(summary, target) : null,
       target,
-      targetLetter: letterFor(target),
+      targetLetter: letterFor(target, resolveScale(c.grade_scale, settings?.grade_scale)),
       remainingWeight: summary.remainingWeight,
       currentPercent: summary.currentPercent,
     };

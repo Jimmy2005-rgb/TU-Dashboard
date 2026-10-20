@@ -19,7 +19,8 @@ import { useEffect, useMemo, useState } from "react";
 import { PlatformBadge, Tag } from "@/components/ui/badges";
 import RichText from "@/components/ui/RichText";
 import { formatDate, formatDue } from "@/lib/dates";
-import { fmtPct, letterFor, summarize } from "@/lib/grades";
+import { useSchedule } from "@/components/ScheduleContext";
+import { fmtPct, letterFor, resolveScale, summarize } from "@/lib/grades";
 import { plural, shortTitle } from "@/lib/text";
 import type { Assignment, Course, CourseMaterial, GradeComponent, GradeItem, PracticeSession, QuizQuestion } from "@/lib/types";
 import AssignmentModal from "@/components/AssignmentModal";
@@ -53,6 +54,8 @@ export default function CourseDetailClient({
   aiEnabled: boolean;
 }) {
   const router = useRouter();
+  const { settings } = useSchedule();
+  const scale = resolveScale(course.grade_scale, settings?.grade_scale);
   const courseColor = useCourseColorClass(course.course_code);
   const [tutorOpen, setTutorOpen] = useState(false);
   const [list, setList] = useState(assignments);
@@ -120,7 +123,7 @@ export default function CourseDetailClient({
         </Stat>
         <Stat
           label="Grade so far"
-          value={grade.currentPercent == null ? "—" : `${fmtPct(grade.currentPercent, 0)} ${letterFor(grade.currentPercent)}`}
+          value={grade.currentPercent == null ? "—" : `${fmtPct(grade.currentPercent, 1)} ${letterFor(grade.currentPercent, scale)}`}
           sub={grade.gradedWeight > 0 ? `${fmtPct(grade.gradedWeight, 0)} of course graded` : "add scores below"}
         />
         <Stat label="Saved questions" value={String(questions.length)} sub="in the vault" />

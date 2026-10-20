@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/components/ui/api";
 import { formatDate } from "@/lib/dates";
-import { fmtPct, LETTER_SCALE, letterFor, neededOnRemaining, summarize, type ComponentResult } from "@/lib/grades";
+import { useSchedule } from "@/components/ScheduleContext";
+import { fmtPct, letterFor, neededOnRemaining, resolveScale, summarize, type ComponentResult, type GradeScale } from "@/lib/grades";
 import type { Course, GradeComponent, GradeItem } from "@/lib/types";
+import GradeScaleEditor from "./GradeScaleEditor";
 import OutlineImportModal from "./OutlineImportModal";
-
-const TARGETS = LETTER_SCALE.filter((g) => g.letter !== "F");
 
 export default function GradesPanel({
   course,
@@ -33,6 +33,14 @@ export default function GradesPanel({
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const { settings } = useSchedule();
+  const [scales, setScales] = useState<{ courseScale: GradeScale | null; defaultScale: GradeScale | null }>({
+    courseScale: course.grade_scale ?? null,
+    defaultScale: settings?.grade_scale ?? null,
+  });
+  const scale = resolveScale(scales.courseScale, scales.defaultScale);
+  // Any grade can be a target except the lowest (fail) one.
+  const TARGETS = scale.slice(0, -1);
 
   // Pick up fresh server data after router.refresh() (e.g. after an outline import).
   useEffect(() => setComponents(initialComponents), [initialComponents]);
@@ -40,7 +48,7 @@ export default function GradesPanel({
 
   const summary = useMemo(() => summarize(components, items), [components, items]);
   const needed = neededOnRemaining(summary, target);
-  const targetLetter = letterFor(target);
+  const targetLetter = letterFor(target, scale);
 
   async function changeTarget(value: number) {
     const before = target;
@@ -141,7 +149,7 @@ export default function GradesPanel({
               <p className="text-xs text-slate-500">Grade so far</p>
               <p className="mt-1 flex items-baseline gap-2">
                 <span className="text-2xl font-bold">{fmtPct(summary.currentPercent)}</span>
-                <span className="rounded bg-tu-50 px-1.5 py-0.5 text-sm font-semibold text-tu-700">{letterFor(summary.currentPercent)}</span>
+                <span className="rounded bg-tu-50 px-1.5 py-0.5 text-sm font-semibold text-tu-700">{letterFor(summary.currentPercent, scale)}</span>
               </p>
               <p className="mt-1 text-[11px] text-slate-400">
                 {summary.gradedWeight > 0
@@ -189,7 +197,7 @@ export default function GradesPanel({
               <p className="text-xs text-slate-500">To get {targetLetter}</p>
               {needed == null ? (
                 <p className="mt-1 text-sm font-medium text-slate-700">
-                  Everything is graded — final {fmtPct(summary.currentPercent)} ({letterFor(summary.currentPercent)})
+                  Everything is graded — final {fmtPct(summary.currentPercent)} ({letterFor(summary.currentPercent, scale)})
                 </p>
               ) : needed <= 0 ? (
                 <p className="mt-1 text-sm font-semibold text-emerald-700">Already secured 🎉</p>
@@ -233,11 +241,12 @@ export default function GradesPanel({
             ))}
           </ul>
           <p className="mt-2 text-[11px] text-slate-400">
-            Letter grades use the common TU cut-offs (A 80, B+ 75, B 70, C+ 65, C 60, D+ 55, D 50); your professor may curve differently.
-            Parts with only some results use your average so far.
+            Parts with only some results use your average so far. Letter grades follow the grade scale below.
           </p>
         </>
       )}
+
+      <GradeScaleEditor courseCode={course.course_code} courseScale={scales.courseScale} defaultScale={scales.defaultScale} onChange={setScales} />
 
       {/* Add part */}
       <form onSubmit={addPart} className="mt-4 flex flex-wrap items-center gap-2">

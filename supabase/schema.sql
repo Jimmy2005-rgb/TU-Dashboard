@@ -317,3 +317,9 @@ create policy "question_reviews_owner_all" on public.question_reviews
   for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 revoke all on public.class_slots, public.study_settings, public.exams, public.question_reviews from anon;
+
+-- ─── Editable grade scale (migration 006) ─────────────────────────────
+alter table public.study_settings
+  add column if not exists grade_scale jsonb check (grade_scale is null or jsonb_typeof(grade_scale) = 'array');
+alter table public.courses
+  add column if not exists grade_scale jsonb check (grade_scale is null or jsonb_typeof(grade_scale) = 'array');

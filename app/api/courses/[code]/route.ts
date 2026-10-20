@@ -1,20 +1,29 @@
 import { NextResponse } from "next/server";
 import { jsonError, readJson } from "@/lib/http";
+import { scaleProblem } from "@/lib/grades";
 import { UpdateCourseTargetRequest } from "@/lib/schemas";
 import { FILES_BUCKET } from "@/lib/files";
 import { getOwnerId, getSupabaseAdmin, normalizeCourseCode } from "@/lib/supabase";
 import type { Course } from "@/lib/types";
 
-/** PATCH /api/courses/:code  { target_percent } — the grade you're aiming for. */
+/** PATCH /api/courses/:code  { target_percent?, grade_scale? } — the grade you're aiming for and this course's letter cut-offs. */
 export async function PATCH(req: Request, { params }: { params: { code: string } }) {
   const code = normalizeCourseCode(params.code);
   if (!code) return jsonError("Invalid course code.");
   const parsed = await readJson(req, UpdateCourseTargetRequest);
   if (parsed.error) return parsed.error;
 
+  const patch: Record<string, unknown> = {};
+  if (parsed.data.target_percent !== undefined) patch.target_percent = parsed.data.target_percent;
+  if (parsed.data.grade_scale !== undefined) {
+    const scale = parsed.data.grade_scale?.map((g) => ({ letter: g.letter.trim(), min: g.min })) ?? null;
+    const problem = scale && scaleProblem(scale);
+    if (problem) return jsonError(problem);
+    patch.grade_scale = scale;
+  }
   const { data, error } = await getSupabaseAdmin()
     .from("courses")
-    .update({ target_percent: parsed.data.target_percent })
+    .update(patch)
     .eq("course_code", code)
     .select("*")
     .maybeSingle<Course>();
