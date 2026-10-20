@@ -2,8 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import AppShell from "@/components/AppShell";
 import { CourseColorProvider } from "@/components/CourseColors";
+import { ScheduleProvider } from "@/components/ScheduleContext";
 import { isAuthEnabled } from "@/lib/auth";
 import { assignCourseColors, type CourseColorInput } from "@/lib/course-colors";
+import { loadSchedule } from "@/lib/schedule-data";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import "./globals.css";
 
@@ -35,7 +37,7 @@ async function loadCourseColors(): Promise<Record<string, number>> {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const colors = await loadCourseColors();
+  const [colors, schedule] = await Promise.all([loadCourseColors(), loadSchedule()]);
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <head>
@@ -43,7 +45,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className="font-sans">
         <CourseColorProvider colors={colors}>
-          <AppShell authEnabled={isAuthEnabled()}>{children}</AppShell>
+          <ScheduleProvider value={schedule}>
+            <AppShell authEnabled={isAuthEnabled()}>{children}</AppShell>
+          </ScheduleProvider>
         </CourseColorProvider>
       </body>
     </html>

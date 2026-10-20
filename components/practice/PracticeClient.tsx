@@ -16,22 +16,24 @@ import {
   Trophy,
   XCircle,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCourseColors } from "@/components/CourseColors";
 import { CourseBadge, Tag } from "@/components/ui/badges";
 import { api } from "@/components/ui/api";
 import RichText from "@/components/ui/RichText";
 import { formatDate } from "@/lib/dates";
 import { plural } from "@/lib/text";
-import type { Course, PracticeSession, QuizQuestion } from "@/lib/types";
+import { shortDate, bangkokDateKey } from "@/lib/schedule";
+import type { Course, PracticeSession, QuestionReview, QuizQuestion } from "@/lib/types";
 import AddQuestionModal from "./AddQuestionModal";
 import PasteQuizModal from "./PasteQuizModal";
 import QuizRunner, { type AnswerRecord } from "./QuizRunner";
 
+type Source = "bank" | "ai_variation" | "review";
 type Mode =
   | { kind: "idle" }
-  | { kind: "running"; questions: QuizQuestion[]; source: "bank" | "ai_variation"; key: number }
-  | { kind: "results"; answers: AnswerRecord[]; source: "bank" | "ai_variation"; saved: boolean };
+  | { kind: "running"; questions: QuizQuestion[]; source: Source; key: number }
+  | { kind: "results"; answers: AnswerRecord[]; source: Source; saved: boolean };
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -46,12 +48,16 @@ export default function PracticeClient({
   courses,
   initialQuestions,
   initialSessions,
+  initialReviews = [],
+  startReview = false,
   initialCourse,
   aiEnabled,
 }: {
   courses: Course[];
   initialQuestions: QuizQuestion[];
   initialSessions: PracticeSession[];
+  initialReviews?: QuestionReview[];
+  startReview?: boolean;
   initialCourse?: string;
   aiEnabled: boolean;
 }) {
@@ -91,7 +97,33 @@ export default function PracticeClient({
   const pool = tag === "all" ? courseQuestions : courseQuestions.filter((q) => q.tags.includes(tag));
   const courseName = courses.find((c) => c.course_code === course)?.name;
 
-  function start(list: QuizQuestion[], source: "bank" | "ai_variation") {
+  // ─── Mistakes review ──────────────────────────────────────────────────
+  const [reviews, setReviews] = useState(initialReviews);
+  const review = useMemo(() => {
+    const byId = new Map(questions.map((q) => [q.id, q]));
+    const nowIso = new Date().toISOString();
+    const open = reviews.filter((r) => r.due_at && byId.has(r.question_id));
+    const due = open.filter((r) => r.due_at! <= nowIso);
+    const nextDue = open.filter((r) => r.due_at! > nowIso).sort((a, b) => a.due_at!.localeCompare(b.due_at!))[0]?.due_at ?? null;
+    return {
+      due: due.map((r) => byId.get(r.question_id)!),
+      open: open.map((r) => byId.get(r.question_id)!),
+      mastered: reviews.filter((r) => !r.due_at && byId.has(r.question_id)).length,
+      nextDue,
+    };
+  }, [reviews, questions]);
+  const courseMistakes = review.open.filter((q) => q.course_code === course);
+
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (startReview && !autoStarted.current && review.due.length) {
+      autoStarted.current = true;
+      start(shuffle(review.due).slice(0, 30), "review");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function start(list: QuizQuestion[], source: Source) {
     setError(null);
     setMode({ kind: "running", questions: list, source, key: Date.now() });
   }
@@ -115,12 +147,14 @@ export default function PracticeClient({
     }
   }
 
-  async function finish(answers: AnswerRecord[], source: "bank" | "ai_variation") {
+  async function finish(answers: AnswerRecord[], source: Source) {
     setMode({ kind: "results", answers, source, saved: false });
+    const answeredCourses = [...new Set(answers.map((a) => a.question.course_code))];
     try {
-      const { session } = await api<{ session: PracticeSession }>("/api/practice-sessions", {
+      const { session, reviews: changed } = await api<{ session: PracticeSession; reviews: QuestionReview[] }>("/api/practice-sessions", {
         body: {
-          course_code: course,
+          course_code: answeredCourses.length === 1 ? answeredCourses[0] : null,
+          results: answers.filter((a) => !a.question.id.startsWith("tmp-")).map((a) => ({ question_id: a.question.id, correct: a.correct })),
           score: answers.filter((a) => a.correct).length,
           total_questions: answers.length,
           missed_tags: answers.filter((a) => !a.correct).flatMap((a) => a.question.tags),
@@ -128,6 +162,7 @@ export default function PracticeClient({
         },
       });
       setSessions((prev) => [session, ...prev].slice(0, 10));
+      if (changed?.length) setReviews((prev) => [...prev.filter((r) => !changed.some((c) => c.question_id === r.question_id)), ...changed]);
       setMode({ kind: "results", answers, source, saved: true });
     } catch (err) {
       setError(`Couldn't save this session: ${(err as Error).message}`);
@@ -152,7 +187,7 @@ export default function PracticeClient({
       <QuizRunner
         key={mode.key}
         questions={mode.questions}
-        title={`${course}${courseName ? ` · ${courseName}` : ""}${mode.source === "ai_variation" ? " · AI Variation Quiz" : ""}`}
+        title={mode.source === "review" ? "Mistakes review" : `${course}${courseName ? ` · ${courseName}` : ""}${mode.source === "ai_variation" ? " · AI Variation Quiz" : ""}`}
         onExit={() => setMode({ kind: "idle" })}
         onFinish={(answers) => finish(answers, mode.source)}
       />
@@ -174,6 +209,11 @@ export default function PracticeClient({
           <p className="text-sm text-slate-500">
             {pct}% · {mode.saved ? "Saved to your history" : "Saving…"}
           </p>
+          {mode.answers.some((a) => !a.correct) && (
+            <p className="mx-auto mt-2 max-w-md text-xs text-slate-500">
+              Questions you missed will come back in <strong>Review my mistakes</strong> tomorrow. Get them right and they wait longer (3, 7, 14 days) until they&apos;re mastered.
+            </p>
+          )}
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <button className="btn-secondary" onClick={() => setMode({ kind: "idle" })}>
               Back to vault
@@ -237,6 +277,16 @@ export default function PracticeClient({
           </button>
         </div>
       </div>
+
+      <ReviewCard
+        due={review.due.length}
+        open={review.open.length}
+        mastered={review.mastered}
+        nextDue={review.nextDue}
+        highlight={startReview}
+        onStart={() => start(shuffle(review.due).slice(0, 30), "review")}
+        onStartAll={() => start(shuffle(review.open).slice(0, 30), "review")}
+      />
 
       <div className="mt-5 flex flex-wrap gap-1.5">
         {courseCodes.map((c) => (
@@ -316,6 +366,11 @@ export default function PracticeClient({
                   {generating ? "AI is writing…" : "Generate AI Variation Quiz"}
                   {!aiEnabled && <OffBadge />}
                 </button>
+                {courseMistakes.length > 0 && (
+                  <button className="btn-secondary" onClick={() => start(shuffle(courseMistakes).slice(0, 30), "review")}>
+                    <RotateCcw className="h-4 w-4 text-indigo-600" /> {course} mistakes ({courseMistakes.length})
+                  </button>
+                )}
                 <label className={clsx("ml-1 items-center gap-1.5 text-xs text-slate-500", aiEnabled ? "flex" : "hidden")}>
                   <input
                     type="checkbox"
@@ -434,4 +489,53 @@ const AI_OFF_HINT = "AI is off: add a free GEMINI_API_KEY in Vercel to turn it o
 
 function OffBadge() {
   return <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-500">off</span>;
+}
+
+/** "Review my mistakes": questions answered wrong come back on a spaced schedule. */
+function ReviewCard({
+  due,
+  open,
+  mastered,
+  nextDue,
+  highlight,
+  onStart,
+  onStartAll,
+}: {
+  due: number;
+  open: number;
+  mastered: number;
+  nextDue: string | null;
+  highlight: boolean;
+  onStart: () => void;
+  onStartAll: () => void;
+}) {
+  if (!open && !mastered) return null;
+  return (
+    <div className={clsx("mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3", due ? "border-indigo-200 bg-indigo-50" : "border-slate-200 bg-surface", highlight && "ring-2 ring-indigo-300")}>
+      <div className="flex items-center gap-3">
+        <RotateCcw className={clsx("h-5 w-5", due ? "text-indigo-600" : "text-slate-400")} />
+        <div>
+          <p className={clsx("font-semibold", due ? "text-indigo-950" : "text-slate-900")}>Review my mistakes</p>
+          <p className="text-xs text-slate-600">
+            {due ? `${due} due today` : "All caught up ✓"}
+            {open > due ? ` · ${open - due} waiting` : ""}
+            {mastered ? ` · ${mastered} mastered` : ""}
+            {!due && nextDue ? ` · next ${shortDate(bangkokDateKey(new Date(nextDue).getTime()))}` : ""}
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        {due > 0 && (
+          <button className="btn bg-indigo-600 text-white hover:bg-indigo-700" onClick={onStart}>
+            <Play className="h-4 w-4" /> Start review ({Math.min(due, 30)})
+          </button>
+        )}
+        {open > due && (
+          <button className="btn-secondary" onClick={onStartAll}>
+            Practise all {open} now
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }

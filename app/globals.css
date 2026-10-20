@@ -13,14 +13,28 @@
 .course-4 { --course: #eda100; }
 .course-5 { --course: #e87ba4; }
 .course-6 { --course: #008300; }
-.course-7 { --course: #6250d6; }
+.course-7 { --course: #7a4fd9; }
+.course-8 { --course: #9a6324; }
+.course-9 { --course: #b4359e; }
+.course-10 { --course: #5cc8f0; }
+.course-11 { --course: #b5cc18; }
+.course-12 { --course: #00727a; }
+.course-13 { --course: #7a7a7a; }
+.course-14 { --course: #8b1e3f; }
 .dark .course-1 { --course: #3987e5; }
 .dark .course-2 { --course: #d95926; }
 .dark .course-3 { --course: #199e70; }
 .dark .course-4 { --course: #c98500; }
-.dark .course-5 { --course: #d55181; }
+.dark .course-5 { --course: #f08cb4; }
 .dark .course-6 { --course: #008300; }
-.dark .course-7 { --course: #9085e9; }
+.dark .course-7 { --course: #9a7cf0; }
+.dark .course-8 { --course: #8f5f2e; }
+.dark .course-9 { --course: #c455b0; }
+.dark .course-10 { --course: #7fd6f5; }
+.dark .course-11 { --course: #b8d02a; }
+.dark .course-12 { --course: #14868f; }
+.dark .course-13 { --course: #9a9a9a; }
+.dark .course-14 { --course: #a8324f; }
 
 body {
   @apply bg-slate-50 text-slate-900 antialiased;

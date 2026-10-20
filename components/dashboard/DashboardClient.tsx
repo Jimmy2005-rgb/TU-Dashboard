@@ -17,10 +17,12 @@ import {
   urgencyBucket,
   type UrgencyBucket,
 } from "@/lib/dates";
-import { PLATFORM_LABELS, type Assignment, type Course, type SourcePlatform } from "@/lib/types";
+import type { GradeNeed } from "@/lib/grade-needs";
+import { PLATFORM_LABELS, type Assignment, type Course, type Exam, type SourcePlatform } from "@/lib/types";
 import { shortTitle } from "@/lib/text";
 import AddAssignmentModal from "./AddAssignmentModal";
 import QuickAddModal from "./QuickAddModal";
+import TodayStrip from "./TodayStrip";
 
 const BUCKET_ORDER: UrgencyBucket[] = ["overdue", "within48h", "thisWeek", "later", "noDate"];
 const BUCKET_ACCENT: Record<UrgencyBucket, string> = {
@@ -48,11 +50,17 @@ export default function DashboardClient({
   courses,
   serverNow,
   aiEnabled,
+  exams = [],
+  needs = {},
+  reviewDue = 0,
 }: {
   initialAssignments: Assignment[];
   courses: Course[];
   serverNow: number;
   aiEnabled: boolean;
+  exams?: Exam[];
+  needs?: Record<string, GradeNeed>;
+  reviewDue?: number;
 }) {
   const [assignments, setAssignments] = useState(initialAssignments);
   const [now, setNow] = useState(serverNow);
@@ -209,6 +217,9 @@ export default function DashboardClient({
 
       {/* Next up */}
       <NextUpCard task={nextUp} now={now} week={week} onDone={complete} onOpen={(id) => setOpenId(id)} />
+
+      {/* Today's classes, exam countdown, mistakes to review */}
+      <TodayStrip now={now} exams={exams} needs={needs} reviewDue={reviewDue} />
 
       {/* At a glance */}
       <div data-calm="hide" className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">

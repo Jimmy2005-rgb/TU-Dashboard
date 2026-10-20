@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { parseAssignmentsWithAI } from "@/lib/ai-tasks";
 import { aiErrorStatus, describeAiError } from "@/lib/ai";
+import { classCalendarForAi } from "@/lib/schedule";
+import { loadSchedule } from "@/lib/schedule-data";
 import { jsonError } from "@/lib/http";
 import { ParseAssignmentRequest } from "@/lib/schemas";
 import { ensureCourses, getOwnerId, getSupabaseAdmin } from "@/lib/supabase";
@@ -28,7 +30,9 @@ export async function POST(req: Request) {
 
   let result;
   try {
-    result = await parseAssignmentsWithAI(text, default_course_code, parsed.files, (knownCourses ?? []) as Course[]);
+    const { slots, settings } = await loadSchedule();
+    const calendar = classCalendarForAi(slots, settings, Date.now());
+    result = await parseAssignmentsWithAI(text, default_course_code, parsed.files, (knownCourses ?? []) as Course[], calendar);
   } catch (err) {
     console.error("[parse-assignment] AI error", err);
     return jsonError(describeAiError(err), aiErrorStatus(err));

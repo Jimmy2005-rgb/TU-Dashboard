@@ -4,10 +4,12 @@ import clsx from "clsx";
 import { CalendarClock, CheckCircle2, Circle, ExternalLink, Loader2, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSchedule } from "@/components/ScheduleContext";
 import { CourseBadge, PlatformBadge } from "@/components/ui/badges";
 import Modal from "@/components/ui/Modal";
 import { api } from "@/components/ui/api";
 import { formatDue, relativeDue, toBangkokInputs } from "@/lib/dates";
+import { bangkokDateKey, courseClasses, hhmm, shortDate, upcomingClasses } from "@/lib/schedule";
 import type { Assignment, SourcePlatform } from "@/lib/types";
 
 /**
@@ -212,6 +214,12 @@ export default function AssignmentModal({
               />
             </div>
           </div>
+          <ClassDuePicker
+            courseCode={form.course_code}
+            hintText={`${form.title} ${form.description}`}
+            disabled={busy}
+            onPick={(date, time) => setForm((f) => ({ ...f, due_date: date, due_time: time }))}
+          />
           <div>
             <label className="label" htmlFor="e-desc">
               Details
@@ -263,4 +271,67 @@ function toForm(a: Assignment | null) {
     description: a?.description ?? "",
     external_link: a?.external_link ?? "",
   };
+}
+
+/**
+ * "Due before a class" helper: lists this course's coming classes (numbered when the
+ * semester start is set) and spots "Class 11" in the text to suggest that date.
+ */
+function ClassDuePicker({
+  courseCode,
+  hintText,
+  disabled,
+  onPick,
+}: {
+  courseCode: string;
+  hintText: string;
+  disabled: boolean;
+  onPick: (date: string, time: string) => void;
+}) {
+  const { slots, settings } = useSchedule();
+  const code = courseCode.trim().toUpperCase();
+  const own = slots.filter((s) => s.course_code === code);
+  if (!own.length) return null;
+
+  const today = bangkokDateKey(Date.now());
+  const numbered = courseClasses(own, settings, code);
+  const list = (numbered.length ? numbered : upcomingClasses(own, settings, Date.now(), 70)).filter((c) => c.date >= today).slice(0, 20);
+  const mentioned = /\bclass\s*(?:no\.?\s*)?#?(\d{1,2})\b/i.exec(hintText);
+  const suggestion = mentioned ? numbered.find((c) => c.n === Number(mentioned[1])) : undefined;
+  const label = (c: (typeof list)[number]) => `${c.n ? `Class ${c.n} · ` : ""}${shortDate(c.date)}, ${hhmm(c.slot.start_time)}`;
+
+  return (
+    <div className="rounded-xl bg-slate-50 p-3">
+      {suggestion && (
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="text-slate-700">
+            Mentions <strong>Class {suggestion.n}</strong> = {shortDate(suggestion.date)}, {hhmm(suggestion.slot.start_time)}
+          </span>
+          <button type="button" className="btn-secondary px-2.5 py-1 text-xs" disabled={disabled} onClick={() => onPick(suggestion.date, hhmm(suggestion.slot.start_time))}>
+            Use this
+          </button>
+        </div>
+      )}
+      <label className="label" htmlFor="e-class">
+        Or: due at the start of a class
+      </label>
+      <select
+        id="e-class"
+        className="input"
+        value=""
+        disabled={disabled}
+        onChange={(e) => {
+          const c = list[Number(e.target.value)];
+          if (c) onPick(c.date, hhmm(c.slot.start_time));
+        }}
+      >
+        <option value="">Pick a class…</option>
+        {list.map((c, i) => (
+          <option key={`${c.date}-${c.slot.id}`} value={i}>
+            {label(c)}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 }

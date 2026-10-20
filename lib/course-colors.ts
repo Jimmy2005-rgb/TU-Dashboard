@@ -3,8 +3,11 @@
  * the rest are given the least-used slot in creation order, so colours stay
  * stable as you add courses. The code is always shown next to the colour.
  */
-export const COURSE_COLOR_COUNT = 7;
-export const COURSE_COLOR_NAMES = ["Blue", "Orange", "Aqua", "Yellow", "Pink", "Green", "Violet"];
+export const COURSE_COLOR_COUNT = 14;
+export const COURSE_COLOR_NAMES = [
+  "Blue", "Orange", "Aqua", "Yellow", "Pink", "Green", "Violet",
+  "Brown", "Magenta", "Sky", "Lime", "Teal", "Grey", "Maroon",
+];
 
 export type CourseColorInput = { course_code: string; color: number | null; created_at: string };
 

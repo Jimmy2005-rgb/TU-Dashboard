@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { BookOpen, BrainCircuit, GraduationCap, LayoutDashboard, LogOut, Settings2 } from "lucide-react";
+import { BookOpen, BrainCircuit, CalendarClock, GraduationCap, LayoutDashboard, LogOut, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCourseColors } from "./CourseColors";
@@ -9,6 +9,7 @@ import DisplaySettings from "./DisplaySettings";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/schedule", label: "Timetable", icon: CalendarClock },
   { href: "/practice", label: "Quiz Vault", icon: BrainCircuit },
   { href: "/courses", label: "Courses", icon: BookOpen },
 ];

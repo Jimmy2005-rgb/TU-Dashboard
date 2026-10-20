@@ -6,7 +6,9 @@ import {
   ParsedOutlineSchema,
   type ParsedOutline,
   ParsedQuizSchema,
+  ParsedScheduleSchema,
   type NormalizedQuestion,
+  type ParsedSchedule,
   type ParsedAssignments,
   type ParsedQuestion,
 } from "./schemas";
@@ -24,7 +26,7 @@ Input is raw text and/or attached files (PDFs, photos or screenshots): a syllabu
 Rules:
 - One entry per distinct deliverable. Do not invent tasks that are not in the text.
 - course_code: Thammasat style (2-4 letters + 3 digits, no space, e.g. FN201, AC201, MK201). Use the code in the text. If the text has no code but clearly names one of the student's courses (by course title, e.g. "Digital Technology"), use that course's code from the list supplied. Otherwise use the default course code supplied, else null. Don't guess from the topic alone.
-- due_date: resolve relative dates ("next Friday", "Week 5") against the current date supplied. If only a date is given, use 23:59 that day. Always output ISO 8601 with the +07:00 offset. If the text gives no usable deadline, return null — never guess.
+- due_date: resolve relative dates ("next Friday", "Week 5") against the current date supplied. If a class timetable is supplied, use it: "before Class 11" or "by next class" = that class's start time, and an in-class quiz or exam = the class start time. If only a date is given, use 23:59 that day. Always output ISO 8601 with the +07:00 offset. If the text gives no usable deadline, return null — never guess.
 - Thai dates and Buddhist-era years (e.g. 2569) must be converted to the Gregorian calendar (subtract 543).
 - Keep descriptions concise: deliverables, format, weighting, submission channel.
 - courses_detected: each course mentioned with its name and professor if stated.`;
@@ -34,6 +36,7 @@ export async function parseAssignmentsWithAI(
   defaultCourseCode?: string | null,
   files: AiFile[] = [],
   knownCourses: Pick<Course, "course_code" | "name">[] = [],
+  classCalendar = "",
 ): Promise<ParsedAssignments> {
   const input = [
     `Current date: ${bangkokNow()}`,
@@ -42,6 +45,7 @@ export async function parseAssignmentsWithAI(
       ? `Student's courses: ${knownCourses.map((c) => (c.name && c.name !== c.course_code ? `${c.course_code} = ${c.name}` : c.course_code)).join("; ")}`
       : "",
     files.length ? `Attached files: ${files.map((f) => f.name).join(", ")}` : "",
+    classCalendar ? `\n<class_timetable>\n${classCalendar}\n</class_timetable>` : "",
     "",
     "<text>",
     text || "(no pasted text — read the attached files)",
@@ -220,4 +224,69 @@ How to tutor:
 - ${MATH_FORMAT}
 ${topics.length ? `\nTopics the student has been practising: ${topics.join(", ")}.` : ""}
 ${samples ? `\nExamples from the student's saved question bank for this course (use them to match the course's level and style):\n${samples}` : ""}`;
+}
+
+// ─── Timetable & exam schedule ────────────────────────────────────────────
+
+const SCHEDULE_SYSTEM = `You read a Thammasat University BBA student's class timetable, exam schedule or academic calendar (pasted text, a PDF, or a screenshot from reg.tu.ac.th or a course outline) and turn it into structured data.
+
+Rules:
+- classes: one entry per course per weekday it meets. weekday: 1 = Monday … 7 = Sunday. Thai day names: จันทร์ = 1, อังคาร = 2, พุธ = 3, พฤหัสบดี = 4, ศุกร์ = 5, เสาร์ = 6, อาทิตย์ = 7; abbreviations like "MO", "TU", "WE", "TH", "FR", "SA", "SU" too. Times in 24-hour HH:MM (Bangkok).
+- course_code: 2-4 letters + 3 digits, no space (e.g. "AC 201" → "AC201"). Use the student's course list to match names to codes.
+- exams: midterm and final exams (and any dated quizzes/presentations) with date and time, ISO 8601 with +07:00. Thai dates and Buddhist-era years (e.g. 2569) must be converted to the Gregorian calendar (subtract 543). If only a date is given with no time, use 09:00.
+- semester_start / semester_end / no_class_days only when the text states them (e.g. an academic calendar). Never invent dates.
+- Return empty arrays for anything not present.`;
+
+export async function parseScheduleWithAI(
+  text: string,
+  files: AiFile[] = [],
+  knownCourses: Pick<Course, "course_code" | "name">[] = [],
+): Promise<ParsedSchedule> {
+  const input = [
+    `Current date: ${bangkokNow()}`,
+    knownCourses.length ? `Student's courses: ${knownCourses.map((c) => `${c.course_code} = ${c.name}`).join("; ")}` : "",
+    files.length ? `Attached files: ${files.map((f) => f.name).join(", ")}` : "",
+    "",
+    "<text>",
+    text || "(no pasted text — read the attached files)",
+    "</text>",
+  ].join("\n");
+
+  const result = await extractStructured({ system: SCHEDULE_SYSTEM, input, schema: ParsedScheduleSchema, files });
+  const time = (t: string) => {
+    const m = /^(\d{1,2})[:.](\d{2})/.exec(t.trim());
+    return m ? `${m[1].padStart(2, "0")}:${m[2]}` : "";
+  };
+  const day = (d: string | null) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d.trim()) ? d.trim() : null);
+  const kinds = ["midterm", "final", "quiz", "presentation", "other"];
+
+  return {
+    classes: result.classes
+      .map((c) => ({
+        ...c,
+        course_code: normalizeCourseCode(c.course_code) ?? "",
+        weekday: Math.round(Number(c.weekday)),
+        start_time: time(c.start_time),
+        end_time: time(c.end_time),
+        room: c.room?.trim() || null,
+        section: c.section?.trim() || null,
+      }))
+      .filter((c) => c.course_code && c.weekday >= 1 && c.weekday <= 7 && c.start_time && c.end_time > c.start_time),
+    exams: result.exams
+      .map((e) => ({
+        ...e,
+        course_code: normalizeCourseCode(e.course_code) ?? "",
+        kind: kinds.includes(e.kind.trim().toLowerCase()) ? e.kind.trim().toLowerCase() : "other",
+        title: e.title.trim().slice(0, 200),
+        starts_at: parseIncomingDate(e.starts_at) ?? "",
+        ends_at: parseIncomingDate(e.ends_at),
+        room: e.room?.trim() || null,
+      }))
+      .filter((e) => e.course_code && e.starts_at && e.title),
+    semester_start: day(result.semester_start),
+    semester_end: day(result.semester_end),
+    no_class_days: result.no_class_days
+      .map((p) => ({ start: day(p.start) ?? "", end: day(p.end) ?? day(p.start) ?? "", label: p.label.trim().slice(0, 100) }))
+      .filter((p) => p.start && p.end >= p.start),
+  };
 }

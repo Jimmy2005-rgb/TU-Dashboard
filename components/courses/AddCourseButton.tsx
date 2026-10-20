@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Check, Loader2, Plus } from "lucide-react";
+import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useCourseColors } from "@/components/CourseColors";
@@ -24,6 +24,7 @@ export default function AddCourseButton({ existing }: { existing?: Course }) {
   const [color, setColor] = useState<number | null>(existing?.color ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const shownColor = color ?? (existing ? colors[existing.course_code] : null);
   const usedBy = (slot: number) =>
@@ -46,6 +47,21 @@ export default function AddCourseButton({ existing }: { existing?: Course }) {
     } catch (err) {
       setError((err as Error).message);
     } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteCourse() {
+    if (!existing) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await api(`/api/courses/${existing.course_code}`, { method: "DELETE" });
+      setOpen(false);
+      router.push("/courses");
+      router.refresh();
+    } catch (err) {
+      setError((err as Error).message);
       setLoading(false);
     }
   }
@@ -74,7 +90,13 @@ export default function AddCourseButton({ existing }: { existing?: Course }) {
           </>
         )}
       </button>
-      <Modal open={open} onClose={() => !loading && setOpen(false)} title={existing ? "Edit course" : "Add course"}>
+      <Modal
+        open={open}
+        onClose={() => {
+          if (loading) return;
+          setOpen(false);
+          setConfirmDelete(false);
+        }} title={existing ? "Edit course" : "Add course"}>
         <form onSubmit={submit} className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             {field("course_code", "Course code", "FN201", "font-mono uppercase")}
@@ -122,7 +144,36 @@ export default function AddCourseButton({ existing }: { existing?: Course }) {
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex justify-end gap-2 pt-1">
+
+          {existing && confirmDelete && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              <p className="font-semibold">Delete {existing.course_code} for good?</p>
+              <p className="mt-1 text-xs leading-relaxed">
+                This removes the course and everything in it: assignments, saved questions, uploaded files, grades, timetable, exams and
+                practice history. It can&apos;t be undone.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button type="button" className="btn bg-red-600 text-white hover:bg-red-700" onClick={deleteCourse} disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Yes, delete {existing.course_code}
+                </button>
+                <button type="button" className="btn-ghost" onClick={() => setConfirmDelete(false)} disabled={loading}>
+                  Keep it
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-1">
+            {existing && !confirmDelete && (
+              <button
+                type="button"
+                className="btn-ghost mr-auto text-red-600 hover:bg-red-50"
+                onClick={() => setConfirmDelete(true)}
+                disabled={loading}
+              >
+                <Trash2 className="h-4 w-4" /> Delete course
+              </button>
+            )}
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)} disabled={loading}>
               Cancel
             </button>

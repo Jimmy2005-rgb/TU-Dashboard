@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { parseAssignmentsWithAI } from "@/lib/ai-tasks";
 import { describeAiError } from "@/lib/ai";
 import { parseIncomingDate } from "@/lib/dates";
+import { classCalendarForAi } from "@/lib/schedule";
+import { loadSchedule } from "@/lib/schedule-data";
 import { jsonError, readJson } from "@/lib/http";
 import { WebhookPayload, type WebhookItem } from "@/lib/schemas";
 import { ensureCourses, getOwnerId, getSupabaseAdmin, normalizeCourseCode } from "@/lib/supabase";
@@ -61,7 +63,8 @@ async function itemToRows(item: WebhookItem, userId: string): Promise<{ rows: Ro
   }
 
   // Unstructured payload (e.g. a forwarded email body): let the AI extract tasks.
-  const parsed = await parseAssignmentsWithAI(item.raw_text ?? "", courseCode);
+  const { slots, settings } = await loadSchedule();
+  const parsed = await parseAssignmentsWithAI(item.raw_text ?? "", courseCode, [], [], classCalendarForAi(slots, settings, Date.now()));
   return {
     rows: parsed.assignments.map((a, i) => ({
       ...base,

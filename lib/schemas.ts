@@ -121,7 +121,9 @@ export const PracticeSessionRequest = z.object({
   score: z.number().int().min(0),
   total_questions: z.number().int().min(1),
   missed_tags: z.array(z.string().max(50)).max(100).default([]),
-  mode: z.enum(["bank", "ai_variation"]).default("bank"),
+  mode: z.enum(["bank", "ai_variation", "review"]).default("bank"),
+  /** Per-question results for saved questions, used to schedule mistake reviews. */
+  results: z.array(z.object({ question_id: z.string().uuid(), correct: z.boolean() })).max(200).default([]),
 });
 
 export const TutorRequest = z.object({
@@ -142,8 +144,8 @@ export const CreateCourseRequest = z.object({
   name: z.string().trim().min(1).max(200),
   professor: z.string().trim().max(200).nullish(),
   semester: z.string().trim().max(50).nullish(),
-  /** 1–7, or null for automatic. Omit to leave unchanged. */
-  color: z.number().int().min(1).max(7).nullable().optional(),
+  /** 1–14, or null for automatic. Omit to leave unchanged. */
+  color: z.number().int().min(1).max(14).nullable().optional(),
 });
 
 export const CreateMaterialRequest = z.object({
@@ -266,3 +268,107 @@ export const ParsedOutlineSchema = z.object({
   ),
 });
 export type ParsedOutline = z.infer<typeof ParsedOutlineSchema>;
+
+// ─── Timetable, exams, mistake review ─────────────────────────────────────
+
+const timeOfDay = z
+  .string()
+  .trim()
+  .regex(/^([01]?\d|2[0-3])[:.][0-5]\d$/, "Use a time like 09:30.")
+  .transform((t) => t.replace(".", ":").padStart(5, "0"));
+const dateKey = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-08-10.");
+
+export const ClassSlotInput = z
+  .object({
+    course_code: z.string().trim().min(5).max(10),
+    weekday: z.coerce.number().int().min(1).max(7),
+    start_time: timeOfDay,
+    end_time: timeOfDay,
+    room: z.string().trim().max(100).nullish(),
+    section: z.string().trim().max(50).nullish(),
+  })
+  .refine((s) => s.end_time > s.start_time, { message: "The class must end after it starts.", path: ["end_time"] });
+
+export const CreateSlotsRequest = z.object({
+  slots: z.array(ClassSlotInput).min(1).max(80),
+  /** Replace the whole timetable (used by the AI import). */
+  replace: z.boolean().default(false),
+});
+
+export const UpdateStudySettingsRequest = z
+  .object({
+    semester_start: dateKey.nullable(),
+    semester_end: dateKey.nullable(),
+    no_class_days: z
+      .array(z.object({ start: dateKey, end: dateKey, label: z.string().trim().max(100).default("") }))
+      .max(60)
+      .default([]),
+  })
+  .refine((s) => !s.semester_start || !s.semester_end || s.semester_end >= s.semester_start, {
+    message: "The semester must end after it starts.",
+    path: ["semester_end"],
+  });
+
+const examKind = z.enum(["midterm", "final", "quiz", "presentation", "other"]);
+
+export const CreateExamRequest = z.object({
+  course_code: z.string().trim().min(5).max(10),
+  kind: examKind.default("other"),
+  title: z.string().trim().min(1, "Give the exam a name.").max(200),
+  /** ISO, or "YYYY-MM-DDTHH:mm" read as Bangkok time. */
+  starts_at: z.string().trim().min(10, "Pick the exam date.").max(100),
+  ends_at: z.string().trim().max(100).nullish().or(z.literal("")),
+  room: z.string().trim().max(100).nullish(),
+  notes: z.string().trim().max(2000).nullish(),
+  component_id: z.string().uuid().nullish().or(z.literal("")),
+});
+
+export const UpdateExamRequest = z
+  .object({
+    kind: examKind,
+    title: z.string().trim().min(1).max(200),
+    starts_at: z.string().trim().min(10).max(100),
+    ends_at: z.string().trim().max(100).nullable(),
+    room: z.string().trim().max(100).nullable(),
+    notes: z.string().trim().max(2000).nullable(),
+    component_id: z.string().uuid().nullable(),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, { message: "Nothing to update." });
+
+export const ParseScheduleRequest = z.object({
+  text: z.string().trim().max(100_000).default(""),
+});
+
+/** What the AI extracts from a timetable / exam schedule / academic calendar. */
+export const ParsedScheduleSchema = z.object({
+  classes: z
+    .array(
+      z.object({
+        course_code: z.string().describe("Course code like AC201 (letters + 3 digits, no space)."),
+        course_name: z.string().nullable(),
+        weekday: z.number().describe("1 = Monday, 2 = Tuesday … 7 = Sunday."),
+        start_time: z.string().describe("24-hour HH:MM, e.g. 09:30."),
+        end_time: z.string().describe("24-hour HH:MM, e.g. 12:30."),
+        room: z.string().nullable(),
+        section: z.string().nullable(),
+      }),
+    )
+    .describe("Weekly class meetings. One entry per course per weekday."),
+  exams: z.array(
+    z.object({
+      course_code: z.string(),
+      kind: z.string().describe('"midterm", "final", "quiz", "presentation" or "other".'),
+      title: z.string().describe("e.g. 'AC201 Midterm exam'."),
+      starts_at: z.string().describe("ISO 8601 with +07:00 offset."),
+      ends_at: z.string().nullable().describe("ISO 8601 with +07:00 offset, or null."),
+      room: z.string().nullable(),
+    }),
+  ),
+  semester_start: z.string().nullable().describe("First day of classes, YYYY-MM-DD, if stated."),
+  semester_end: z.string().nullable().describe("Last day of classes, YYYY-MM-DD, if stated."),
+  no_class_days: z
+    .array(z.object({ start: z.string(), end: z.string(), label: z.string() }))
+    .describe("Holidays, midterm week, reading week — days with no classes (YYYY-MM-DD, end inclusive)."),
+});
+export type ParsedSchedule = z.infer<typeof ParsedScheduleSchema>;

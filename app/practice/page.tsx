@@ -3,12 +3,12 @@ import PracticeClient from "@/components/practice/PracticeClient";
 import SetupNotice from "@/components/SetupNotice";
 import { aiProvider } from "@/lib/ai";
 import { getOwnerId, getSupabaseAdmin } from "@/lib/supabase";
-import type { Course, PracticeSession, QuizQuestion } from "@/lib/types";
+import type { Course, PracticeSession, QuestionReview, QuizQuestion } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Quiz Vault" };
 export const dynamic = "force-dynamic";
 
-export default async function PracticePage({ searchParams }: { searchParams: { course?: string } }) {
+export default async function PracticePage({ searchParams }: { searchParams: { course?: string; review?: string } }) {
   let db;
   try {
     db = getSupabaseAdmin();
@@ -16,7 +16,7 @@ export default async function PracticePage({ searchParams }: { searchParams: { c
     return <SetupNotice message={(err as Error).message} />;
   }
 
-  const [courses, questions, sessions] = await Promise.all([
+  const [courses, questions, sessions, reviews] = await Promise.all([
     db.from("courses").select("*").order("course_code"),
     db.from("quiz_bank").select("*").order("created_at", { ascending: false }).limit(2000),
     db
@@ -25,6 +25,7 @@ export default async function PracticePage({ searchParams }: { searchParams: { c
       .eq("user_id", getOwnerId())
       .order("created_at", { ascending: false })
       .limit(10),
+    db.from("question_reviews").select("*").eq("user_id", getOwnerId()),
   ]);
 
   const error = courses.error ?? questions.error ?? sessions.error;
@@ -35,6 +36,8 @@ export default async function PracticePage({ searchParams }: { searchParams: { c
       courses={(courses.data ?? []) as Course[]}
       initialQuestions={(questions.data ?? []) as QuizQuestion[]}
       initialSessions={(sessions.data ?? []) as PracticeSession[]}
+      initialReviews={reviews.error ? [] : ((reviews.data ?? []) as QuestionReview[])}
+      startReview={searchParams.review === "1"}
       initialCourse={searchParams.course?.toUpperCase()}
       aiEnabled={aiProvider() !== null}
     />
