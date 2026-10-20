@@ -110,26 +110,30 @@ const THINKING = { low: ThinkingLevel.LOW, medium: ThinkingLevel.MEDIUM, high: T
 
 /** Yields a tutor reply as it is generated. */
 export async function* geminiStreamText(opts: ChatOptions): AsyncGenerator<string> {
-  // Fallback applies to starting the reply; a failure mid-stream is reported as-is.
   const contents = toContents(opts.messages);
-  const stream = await withModelFallback((model) =>
-    getGemini().models.generateContentStream({
-      model,
-      contents,
-      config: {
-        systemInstruction: opts.system,
-        // Gemini 3 thinks at "high" by default, which can take a minute+ with photos.
-        // A tutor reply needs to start quickly; older fallback models use their default.
-        ...(model.startsWith("gemini-3") ? { thinkingConfig: { thinkingLevel: THINKING[opts.effort ?? "low"] } } : {}),
-      },
-    }),
-  );
+  const config = (model: string) => ({
+    systemInstruction: opts.system,
+    // Gemini 3 thinks at "high" by default; a tutor reply should start quickly.
+    // Older fallback models keep their default.
+    ...(model.startsWith("gemini-3") ? { thinkingConfig: { thinkingLevel: THINKING[opts.effort ?? "low"] } } : {}),
+  });
 
+  // With photos/files in the conversation, Gemini's streaming endpoint was taking
+  // 100+ s (vs ~4 s for the same request unstreamed), so ask for the whole answer.
+  const hasFiles = opts.messages.some((m) => m.files?.length);
   let finish: FinishReason | undefined;
-  for await (const chunk of stream) {
-    const text = chunk.text;
-    if (text) yield text;
-    finish = chunk.candidates?.[0]?.finishReason ?? finish;
+  if (hasFiles) {
+    const response = await withModelFallback((model) => getGemini().models.generateContent({ model, contents, config: config(model) }));
+    if (response.text) yield response.text;
+    finish = response.candidates?.[0]?.finishReason;
+  } else {
+    // Fallback applies to starting the reply; a failure mid-stream is reported as-is.
+    const stream = await withModelFallback((model) => getGemini().models.generateContentStream({ model, contents, config: config(model) }));
+    for await (const chunk of stream) {
+      const text = chunk.text;
+      if (text) yield text;
+      finish = chunk.candidates?.[0]?.finishReason ?? finish;
+    }
   }
 
   if (finish === FinishReason.SAFETY || finish === FinishReason.RECITATION) {
