@@ -378,7 +378,7 @@ export default function TutorPanel({
                   <Bot className="h-3.5 w-3.5 text-tu-600" />
                 </div>
                 <div className="prose-tutor min-w-0 max-w-[90%]">
-                  {m.content ? <RichText>{m.content}</RichText> : <Loader2 className="mt-1 h-4 w-4 animate-spin text-slate-400" />}
+                  {m.content ? <RichText>{m.content}</RichText> : <Waiting withFiles={Boolean(messages[i - 1]?.attachments?.length)} />}
                 </div>
               </div>
             ),
@@ -518,6 +518,22 @@ export default function TutorPanel({
         </form>
       </aside>
     </div>
+  );
+}
+
+/** Shown until the first words arrive, so a slow reply never looks frozen. */
+function Waiting({ withFiles }: { withFiles: boolean }) {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <span className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+      <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+      {withFiles ? "Reading your attachments" : "Thinking"}… {seconds > 2 && <span className="tabular-nums">{seconds}s</span>}
+      {seconds >= 30 && <span className="text-slate-400">· the AI is busy, hang on</span>}
+    </span>
   );
 }
 

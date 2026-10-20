@@ -1,4 +1,4 @@
-import { ApiError, FinishReason, GoogleGenAI, type Content } from "@google/genai";
+import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel, type Content } from "@google/genai";
 import * as z from "zod";
 import { AiError, type ChatOptions, type ExtractOptions } from "./ai-shared";
 
@@ -106,12 +106,23 @@ export async function geminiExtract<S extends z.ZodType>(opts: ExtractOptions<S>
   return parsed.data;
 }
 
+const THINKING = { low: ThinkingLevel.LOW, medium: ThinkingLevel.MEDIUM, high: ThinkingLevel.HIGH } as const;
+
 /** Yields a tutor reply as it is generated. */
 export async function* geminiStreamText(opts: ChatOptions): AsyncGenerator<string> {
   // Fallback applies to starting the reply; a failure mid-stream is reported as-is.
   const contents = toContents(opts.messages);
   const stream = await withModelFallback((model) =>
-    getGemini().models.generateContentStream({ model, contents, config: { systemInstruction: opts.system } }),
+    getGemini().models.generateContentStream({
+      model,
+      contents,
+      config: {
+        systemInstruction: opts.system,
+        // Gemini 3 thinks at "high" by default, which can take a minute+ with photos.
+        // A tutor reply needs to start quickly; older fallback models use their default.
+        ...(model.startsWith("gemini-3") ? { thinkingConfig: { thinkingLevel: THINKING[opts.effort ?? "low"] } } : {}),
+      },
+    }),
   );
 
   let finish: FinishReason | undefined;
