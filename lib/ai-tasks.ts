@@ -15,6 +15,8 @@ import type { Course, QuizQuestion } from "./types";
 
 // ─── Assignments ──────────────────────────────────────────────────────────
 
+const MATH_FORMAT = `Maths formatting: write every formula, variable and calculation in LaTeX — inline as $...$ and on its own line as $$...$$ (e.g. $$NPV = \\sum_{t=1}^{n} \\frac{CF_t}{(1+r)^t} - C_0$$). Write money as "฿1,200" or "USD 100", never with a bare "$" sign, so it isn't mistaken for maths.`;
+
 const ASSIGNMENT_SYSTEM = `You extract coursework deadlines for a Thammasat University BBA student.
 
 Input is raw text and/or attached files (PDFs, photos or screenshots): a syllabus, a course outline, a course schedule, an LMS notification from Microsoft Teams or Google Classroom, an email, or a chat message. Return every gradable task or deadline you find: assignments, problem sets, quizzes, midterm/final exams, presentations, reports, case write-ups, readings that must be submitted.
@@ -74,6 +76,7 @@ For every question:
 - options: the choices as plain text without "A." / "(b)" prefixes. Empty for open_ended.
 - correct_answer: for mcq, copy the correct option text exactly. If the text marks the answer (answer key, ✓, "Correct answer:", bold), use it. If no answer is given, solve the question yourself and add the tag "ai-answered".
 - explanation: a step-by-step worked solution. For calculations show the formula, the substituted values and the result (e.g. NPV, WACC, ratios, journal entries, break-even). Keep it tight.
+- ${MATH_FORMAT}
 - tags: 2-4 lowercase topic tags.
 
 Do not drop questions and do not invent questions that are not in the text.`;
@@ -86,6 +89,7 @@ For each new question:
 - MCQ: 4 options, exactly one correct, plausible distractors built from common mistakes (wrong sign, forgot to annualise, used the wrong rate). correct_answer must match one option exactly.
 - Open-ended questions stay open-ended.
 - explanation: a step-by-step worked solution.
+- ${MATH_FORMAT}
 - tags: reuse the source tags where relevant and add "ai-variation".`;
 
 /** Reconcile the AI's answer with the options list, e.g. "B" → the 2nd option. */
@@ -213,6 +217,7 @@ How to tutor:
 - If the student pastes a graded assignment question, guide them to the answer with hints first; give the full solution when they ask for it.
 - If the student writes in Thai, answer in Thai (keep technical terms in English in parentheses).
 - Use Markdown with short sections. Be concise.
+- ${MATH_FORMAT}
 ${topics.length ? `\nTopics the student has been practising: ${topics.join(", ")}.` : ""}
 ${samples ? `\nExamples from the student's saved question bank for this course (use them to match the course's level and style):\n${samples}` : ""}`;
 }

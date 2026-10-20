@@ -20,7 +20,9 @@ import { useMemo, useState } from "react";
 import { useCourseColors } from "@/components/CourseColors";
 import { CourseBadge, Tag } from "@/components/ui/badges";
 import { api } from "@/components/ui/api";
+import RichText from "@/components/ui/RichText";
 import { formatDate } from "@/lib/dates";
+import { plural } from "@/lib/text";
 import type { Course, PracticeSession, QuizQuestion } from "@/lib/types";
 import AddQuestionModal from "./AddQuestionModal";
 import PasteQuizModal from "./PasteQuizModal";
@@ -84,7 +86,8 @@ export default function PracticeClient({
   const [mode, setMode] = useState<Mode>({ kind: "idle" });
 
   const courseQuestions = useMemo(() => questions.filter((q) => q.course_code === course), [questions, course]);
-  const tags = useMemo(() => [...new Set(courseQuestions.flatMap((q) => q.tags))].sort(), [courseQuestions]);
+  // "ai-variation" is an internal marker (shown as the AI tag), not a topic.
+  const tags = useMemo(() => [...new Set(courseQuestions.flatMap((q) => q.tags))].filter((t) => t !== "ai-variation").sort(), [courseQuestions]);
   const pool = tag === "all" ? courseQuestions : courseQuestions.filter((q) => q.tags.includes(tag));
   const courseName = courses.find((c) => c.course_code === course)?.name;
 
@@ -200,10 +203,10 @@ export default function PracticeClient({
                 <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
               )}
               <div className="min-w-0 text-sm">
-                <p className="line-clamp-2 text-slate-800">{a.question.question_text}</p>
+                <RichText inline className="line-clamp-2 text-slate-800">{a.question.question_text}</RichText>
                 {!a.correct && (
                   <p className="mt-1 text-xs text-slate-500">
-                    Answer: <span className="font-medium text-emerald-700">{a.question.correct_answer}</span>
+                    Answer: <RichText inline className="inline font-medium text-emerald-700">{a.question.correct_answer}</RichText>
                   </p>
                 )}
               </div>
@@ -220,7 +223,9 @@ export default function PracticeClient({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Quiz Vault</h1>
-          <p className="text-sm text-slate-500">{questions.length} saved questions across {counts.size} courses</p>
+          <p className="text-sm text-slate-500">
+            {plural(questions.length, "saved question")} across {plural(counts.size, "course")}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button className="btn-secondary" onClick={() => setPasteOpen(true)} disabled={!aiEnabled} title={aiEnabled ? undefined : AI_OFF_HINT}>
@@ -241,7 +246,7 @@ export default function PracticeClient({
               setCourse(c);
               setTag("all");
             }}
-            className={clsx(course === c ? "chip-on" : "chip-off", "font-mono", colors[c] && `course-${colors[c]}`)}
+            className={clsx(course === c ? "chip-on" : "chip-off", "font-mono", colors[c] && `course-${colors[c]}`, course !== c && !counts.get(c) && "opacity-60")}
           >
             <span className="course-dot" />
             {c}
@@ -375,7 +380,7 @@ export default function PracticeClient({
               {pool.map((q) => (
                 <li key={q.id} className="group flex items-start gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-sm text-slate-800">{q.question_text}</p>
+                    <RichText inline className="line-clamp-2 text-sm text-slate-800">{q.question_text}</RichText>
                     <div className="mt-1 flex flex-wrap items-center gap-1">
                       <span className="text-[11px] font-medium uppercase text-slate-400">{q.question_type === "mcq" ? "MCQ" : "Open"}</span>
                       {q.source === "ai_variation" && <Tag>AI</Tag>}

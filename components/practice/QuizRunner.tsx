@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { ArrowRight, CheckCircle2, Eye, X, XCircle } from "lucide-react";
 import { useState } from "react";
 import { CourseBadge, Tag } from "@/components/ui/badges";
+import RichText from "@/components/ui/RichText";
 import type { QuizQuestion } from "@/lib/types";
 
 export type AnswerRecord = { question: QuizQuestion; given: string; correct: boolean };
@@ -84,7 +85,7 @@ export default function QuizRunner({
             <Tag key={t}>{t}</Tag>
           ))}
         </div>
-        <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-900">{q.question_text}</p>
+        <RichText className="text-[15px] leading-relaxed text-slate-900">{q.question_text}</RichText>
 
         {q.question_type === "mcq" ? (
           <div className="mt-5 space-y-2">
@@ -105,7 +106,7 @@ export default function QuizRunner({
                   )}
                 >
                   <span className="mt-px font-mono text-xs font-semibold text-slate-400">{String.fromCharCode(65 + i)}</span>
-                  <span className="flex-1">{option}</span>
+                  <RichText inline className="flex-1">{option}</RichText>
                   {current && isCorrect && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />}
                   {current && isChosen && !isCorrect && <XCircle className="h-4 w-4 shrink-0 text-red-600" />}
                 </button>
@@ -134,13 +135,13 @@ export default function QuizRunner({
             {q.question_type === "open_ended" && (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">Model answer</p>
-                <p className="whitespace-pre-wrap text-emerald-950">{q.correct_answer}</p>
+                <RichText className="text-emerald-950">{q.correct_answer}</RichText>
               </div>
             )}
             {q.explanation && (
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Explanation</p>
-                <p className="whitespace-pre-wrap leading-relaxed text-slate-800">{q.explanation}</p>
+                <RichText className="leading-relaxed text-slate-800">{q.explanation}</RichText>
               </div>
             )}
             {q.question_type === "open_ended" && !current && (

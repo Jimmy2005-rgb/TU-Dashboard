@@ -6,6 +6,7 @@ import SetupNotice from "@/components/SetupNotice";
 import { getOwnerId, getSupabaseAdmin } from "@/lib/supabase";
 import { assignCourseColors } from "@/lib/course-colors";
 import { fmtPct, letterFor, summarize } from "@/lib/grades";
+import { plural } from "@/lib/text";
 import type { Course, GradeComponent, GradeItem } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Courses" };
@@ -119,10 +120,10 @@ export default async function CoursesPage() {
 
                 <div data-calm="hide" className="mt-4 flex gap-4 text-xs text-slate-500">
                   <span className="flex items-center gap-1">
-                    <FileText className="h-3.5 w-3.5" /> {s.materials} materials
+                    <FileText className="h-3.5 w-3.5" /> {plural(s.materials, "material")}
                   </span>
                   <span className="flex items-center gap-1">
-                    <BrainCircuit className="h-3.5 w-3.5" /> {s.quiz} questions
+                    <BrainCircuit className="h-3.5 w-3.5" /> {plural(s.quiz, "question")}
                   </span>
                 </div>
               </Link>

@@ -123,3 +123,17 @@ body {
 .prose-tutor th { @apply bg-slate-50 font-semibold; }
 .prose-tutor strong { @apply font-semibold text-slate-900; }
 .prose-tutor a { @apply text-tu-700 underline; }
+
+/* Markdown + maths (AI answers, quiz questions, explanations) */
+.rich-text > :first-child { margin-top: 0; }
+.rich-text > :last-child { margin-bottom: 0; }
+.rich-text p { margin: 0.5em 0; }
+.rich-text ul { @apply my-1.5 list-disc pl-5; }
+.rich-text ol { @apply my-1.5 list-decimal pl-5; }
+.rich-text strong { @apply font-semibold; }
+.rich-text code { @apply rounded bg-slate-100 px-1 py-0.5 font-mono text-[0.85em]; }
+.rich-text table { @apply my-2 w-full border-collapse text-xs; }
+.rich-text th, .rich-text td { @apply border border-slate-200 px-2 py-1 text-left; }
+.rich-inline > span { display: inline; }
+.rich-text .katex { font-size: 1.08em; }
+.rich-text .katex-display { margin: 0.6em 0; overflow-x: auto; overflow-y: hidden; padding: 0.15em 0; }

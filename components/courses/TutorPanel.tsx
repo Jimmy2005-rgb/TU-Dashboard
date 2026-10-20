@@ -2,8 +2,7 @@
 
 import { Bot, Eraser, Loader2, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import RichText from "@/components/ui/RichText";
 import type { Course } from "@/lib/types";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -149,7 +148,7 @@ export default function TutorPanel({ course, open, onClose }: { course: Course; 
                 </div>
                 <div className="prose-tutor min-w-0 max-w-[90%]">
                   {m.content ? (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                    <RichText>{m.content}</RichText>
                   ) : (
                     <Loader2 className="mt-1 h-4 w-4 animate-spin text-slate-400" />
                   )}

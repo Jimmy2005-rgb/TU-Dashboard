@@ -17,8 +17,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { PlatformBadge, Tag } from "@/components/ui/badges";
+import RichText from "@/components/ui/RichText";
 import { formatDate, formatDue } from "@/lib/dates";
 import { fmtPct, letterFor, summarize } from "@/lib/grades";
+import { plural, shortTitle } from "@/lib/text";
 import type { Assignment, Course, CourseMaterial, GradeComponent, GradeItem, PracticeSession, QuizQuestion } from "@/lib/types";
 import AssignmentModal from "@/components/AssignmentModal";
 import { useCourseColorClass } from "@/components/CourseColors";
@@ -122,17 +124,27 @@ export default function CourseDetailClient({
           sub={grade.gradedWeight > 0 ? `${fmtPct(grade.gradedWeight, 0)} of course graded` : "add scores below"}
         />
         <Stat label="Saved questions" value={String(questions.length)} sub="in the vault" />
-        <Stat label="Practice avg" value={avgScore == null ? "—" : `${avgScore}%`} sub={`last ${sessions.length} sessions`} />
+        <Stat label="Practice avg" value={avgScore == null ? "—" : `${avgScore}%`} sub={sessions.length ? `last ${plural(sessions.length, "session")}` : "no practice yet"} />
       </div>
 
+      {/* Jump links: the page is long, so let people go straight to one part. */}
+      <nav aria-label="Sections" className="sticky top-14 z-20 -mx-1 mt-4 flex gap-1.5 overflow-x-auto bg-slate-50/90 px-1 py-2 backdrop-blur lg:top-0">
+        {[
+          ["assignments", "Assignments"],
+          ["grades", "Grades"],
+          ["materials", "Materials"],
+          ["scores", "Score history"],
+          ["questions", "Questions"],
+        ].map(([id, label]) => (
+          <a key={id} href={`#${id}`} className="chip-off shrink-0">
+            {label}
+          </a>
+        ))}
+      </nav>
 
-      <div className="mt-5">
-        <GradesPanel course={course} initialComponents={gradeComponents} initialItems={gradeItems} aiEnabled={aiEnabled} />
-      </div>
-
-      <div className="mt-4 grid gap-4">
+      <div className="mt-3 grid gap-4">
         {/* Assignments */}
-        <section className="card p-5">
+        <section id="assignments" className="scroll-mt-28 card p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-semibold">
               <CheckCircle2 className="h-5 w-5 text-tu-600" /> Assignments
@@ -165,7 +177,7 @@ export default function CourseDetailClient({
                     )}
                     <span className="min-w-0 flex-1">
                       <span className={clsx("block font-medium group-hover:text-tu-700", a.status === "completed" && "text-slate-400 line-through")}>
-                        {a.title}
+                        {shortTitle(a.title, a.course_code)}
                       </span>
                       {a.description && <span className="mt-0.5 line-clamp-2 block text-xs text-slate-500">{a.description}</span>}
                     </span>
@@ -180,12 +192,18 @@ export default function CourseDetailClient({
           )}
         </section>
 
+        <div id="grades" className="scroll-mt-28">
+          <GradesPanel course={course} initialComponents={gradeComponents} initialItems={gradeItems} aiEnabled={aiEnabled} />
+        </div>
+
         {/* Materials & exercises (uploaded files, links and notes) */}
-        <MaterialsPanel courseCode={course.course_code} initialMaterials={initialMaterials} aiEnabled={aiEnabled} />
+        <div id="materials" className="scroll-mt-28">
+          <MaterialsPanel courseCode={course.course_code} initialMaterials={initialMaterials} aiEnabled={aiEnabled} />
+        </div>
       </div>
 
       {/* Score history */}
-      <section className="card mt-4 p-5">
+      <section id="scores" className="card mt-4 scroll-mt-28 p-5">
         <h2 className="flex items-center gap-2 font-semibold">
           <History className="h-5 w-5 text-tu-600" /> Score history
         </h2>
@@ -242,7 +260,7 @@ export default function CourseDetailClient({
       </section>
 
       {/* Saved questions */}
-      <section className="card mt-4 p-5">
+      <section id="questions" className="card mt-4 scroll-mt-28 p-5">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 font-semibold">
             <BrainCircuit className="h-5 w-5 text-tu-600" /> Saved quiz questions
@@ -259,7 +277,7 @@ export default function CourseDetailClient({
               <li key={q.id} className="py-2">
                 <button onClick={() => setExpanded((x) => (x === q.id ? null : q.id))} className="flex w-full items-start gap-2 text-left">
                   <ChevronDown className={clsx("mt-0.5 h-4 w-4 shrink-0 text-slate-400 transition", expanded !== q.id && "-rotate-90")} />
-                  <span className={clsx("text-sm text-slate-800", expanded !== q.id && "line-clamp-1")}>{q.question_text}</span>
+                  <RichText inline={expanded !== q.id} className={clsx("min-w-0 text-sm text-slate-800", expanded !== q.id && "line-clamp-1")}>{q.question_text}</RichText>
                 </button>
                 {expanded === q.id && (
                   <div className="ml-6 mt-2 space-y-2 text-sm">
@@ -267,13 +285,13 @@ export default function CourseDetailClient({
                       <ol className="list-[upper-alpha] space-y-0.5 pl-5 text-slate-700">
                         {q.options.map((o, i) => (
                           <li key={i} className={clsx(o === q.correct_answer && "font-semibold text-emerald-700")}>
-                            {o}
+                            <RichText inline>{o}</RichText>
                           </li>
                         ))}
                       </ol>
                     )}
-                    {q.options.length === 0 && <p className="font-medium text-emerald-700">{q.correct_answer}</p>}
-                    {q.explanation && <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-2.5 text-xs leading-relaxed text-slate-600">{q.explanation}</p>}
+                    {q.options.length === 0 && <RichText className="font-medium text-emerald-700">{q.correct_answer}</RichText>}
+                    {q.explanation && <RichText className="rounded-lg bg-slate-50 p-2.5 text-xs leading-relaxed text-slate-600">{q.explanation}</RichText>}
                     <div className="flex flex-wrap gap-1">
                       {q.tags.map((t) => (
                         <Tag key={t}>{t}</Tag>

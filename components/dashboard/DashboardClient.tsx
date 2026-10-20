@@ -18,6 +18,7 @@ import {
   type UrgencyBucket,
 } from "@/lib/dates";
 import { PLATFORM_LABELS, type Assignment, type Course, type SourcePlatform } from "@/lib/types";
+import { shortTitle } from "@/lib/text";
 import AddAssignmentModal from "./AddAssignmentModal";
 import QuickAddModal from "./QuickAddModal";
 
@@ -370,7 +371,7 @@ function NextUpCard({
                 <PlatformBadge platform={task.source_platform} />
               </div>
               <button onClick={() => onOpen(task.id)} className="mt-1.5 block text-left">
-                <h2 className="text-xl font-semibold leading-snug tracking-tight text-slate-900 hover:text-tu-700 sm:text-2xl">{task.title}</h2>
+                <h2 className="text-xl font-semibold leading-snug tracking-tight text-slate-900 hover:text-tu-700 sm:text-2xl">{shortTitle(task.title, task.course_code)}</h2>
               </button>
               <p className={clsx("mt-1.5 text-sm font-medium", BUCKET_ACCENT[bucket])}>
                 {task.due_date ? (
@@ -492,7 +493,7 @@ function AssignmentRow({
             done ? "text-slate-400 line-through" : "text-slate-900",
           )}
         >
-          {a.title}
+          {shortTitle(a.title, a.course_code)}
         </p>
         {a.description && (
           <p data-calm="hide" className="mt-0.5 line-clamp-1 text-xs leading-relaxed text-slate-500">
