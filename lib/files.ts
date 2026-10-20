@@ -23,10 +23,13 @@ export function safeFileName(name: string): string {
   return `${base || "file"}${ext ? `.${ext}` : ""}`;
 }
 
-/** Storage path for a new upload: owner/COURSE/uuid-name.ext */
-export function newFilePath(ownerId: string, courseCode: string, fileName: string): string {
-  return `${ownerId}/${courseCode}/${randomUUID()}-${safeFileName(fileName)}`;
+/** Storage path for a new upload: owner/COURSE/[folder/]uuid-name.ext */
+export function newFilePath(ownerId: string, courseCode: string, fileName: string, folder?: string): string {
+  return `${ownerId}/${courseCode}/${folder ? `${folder}/` : ""}${randomUUID()}-${safeFileName(fileName)}`;
 }
+
+/** Chat uploads for the AI tutor live in their own folder, so clearing a chat can remove them. */
+export const TUTOR_FOLDER = "tutor";
 
 /** Guard against saving a material that points at someone else's (or another course's) file. */
 export function isOwnedPath(path: string, ownerId: string, courseCode: string): boolean {

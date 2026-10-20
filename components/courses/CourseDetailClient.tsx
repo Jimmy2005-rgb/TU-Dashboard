@@ -341,7 +341,7 @@ export default function CourseDetailClient({
         }}
       />
 
-      <TutorPanel course={course} open={tutorOpen} onClose={() => setTutorOpen(false)} />
+      <TutorPanel course={course} open={tutorOpen} onClose={() => setTutorOpen(false)} materials={initialMaterials} />
     </div>
   );
 }

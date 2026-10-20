@@ -126,17 +126,38 @@ export const PracticeSessionRequest = z.object({
   results: z.array(z.object({ question_id: z.string().uuid(), correct: z.boolean() })).max(200).default([]),
 });
 
+export const TutorAttachment = z.object({
+  /** Path in the course-files bucket (a chat upload or a course material). */
+  path: z.string().min(3).max(500),
+  name: z.string().trim().min(1).max(300),
+  mime_type: z.string().max(200).nullish(),
+});
+
 export const TutorRequest = z.object({
   course_code: z.string().trim().min(5).max(10),
   messages: z
     .array(
-      z.object({
-        role: z.enum(["user", "assistant"]),
-        content: z.string().min(1).max(20_000),
-      }),
+      z
+        .object({
+          role: z.enum(["user", "assistant"]),
+          content: z.string().max(20_000),
+          attachments: z.array(TutorAttachment).max(10).default([]),
+        })
+        .refine((m) => m.content.trim().length > 0 || m.attachments.length > 0, { message: "Message is empty." }),
     )
     .min(1)
     .max(40),
+});
+
+export const TutorUploadUrlRequest = z.object({
+  course_code: z.string().trim().min(5).max(10),
+  file_name: z.string().trim().min(1).max(300),
+  file_size: z.number().int().min(1, "That file is empty.").max(15 * 1024 * 1024, "Files for the tutor can be up to 15 MB."),
+});
+
+export const TutorDeleteFilesRequest = z.object({
+  course_code: z.string().trim().min(5).max(10),
+  paths: z.array(z.string().max(500)).min(1).max(50),
 });
 
 export const CreateCourseRequest = z.object({

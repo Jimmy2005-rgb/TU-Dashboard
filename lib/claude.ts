@@ -75,7 +75,9 @@ export async function* claudeStreamText(opts: ChatOptions): AsyncGenerator<strin
     fallbacks: "default",
     // The system prompt is stable per course, so cache it across turns.
     system: [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }],
-    messages: opts.messages,
+    messages: opts.messages.map((m) =>
+      m.files?.length ? { role: m.role, content: toClaudeContent(m.content || "(see attachment)", m.files) } : { role: m.role, content: m.content },
+    ),
     output_config: { effort: opts.effort ?? "medium" },
   });
 

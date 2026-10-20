@@ -61,7 +61,10 @@ function toGeminiSchema(schema: z.ZodType): Record<string, unknown> {
 }
 
 function toContents(messages: ChatOptions["messages"]): Content[] {
-  return messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
+  return messages.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [...(m.files ?? []).map((f) => ({ inlineData: { mimeType: f.mimeType, data: f.data } })), { text: m.content || "(see attachment)" }],
+  }));
 }
 
 /** Structured extraction: Gemini returns JSON constrained to `schema`, validated again with Zod. */

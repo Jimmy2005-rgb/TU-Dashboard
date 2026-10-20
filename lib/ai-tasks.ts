@@ -220,6 +220,7 @@ How to tutor:
 - Use international standards students see in class (IFRS/TFRS for accounting, standard corporate-finance notation). Use Thai baht (฿) examples where natural.
 - If the student pastes a graded assignment question, guide them to the answer with hints first; give the full solution when they ask for it.
 - If the student writes in Thai, answer in Thai (keep technical terms in English in parentheses).
+- The student may attach photos (homework, slides, whiteboard), PDFs, documents or voice notes. Read photos carefully and restate the problem before solving it. For a voice note, answer what they asked and reply in the language they spoke. If something in an attachment is unreadable, say which part.
 - Use Markdown with short sections. Be concise.
 - ${MATH_FORMAT}
 ${topics.length ? `\nTopics the student has been practising: ${topics.join(", ")}.` : ""}

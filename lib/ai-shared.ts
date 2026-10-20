@@ -31,7 +31,8 @@ export interface ExtractOptions<S extends z.ZodType> {
 
 export interface ChatOptions {
   system: string;
-  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  /** `files` (photos, PDFs, audio…) belong to that message and are sent before its text. */
+  messages: Array<{ role: "user" | "assistant"; content: string; files?: AiFile[] }>;
   effort?: Effort;
 }
 
